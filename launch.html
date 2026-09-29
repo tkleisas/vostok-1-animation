@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vostok 1 — Launch &amp; Orbit</title>
+<style>
+  :root { --ink:#dce4ee; --dim:#7d8a9c; --panel:rgba(8,11,16,.74); --line:rgba(150,170,200,.18); }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:#000; overflow:hidden;
+              font:12px/1.45 "DejaVu Sans Mono", ui-monospace, Menlo, Consolas, monospace; color:var(--ink); }
+  canvas { display:block; }
+  a { color:#7fb4ff; }
+
+  #ui { position:fixed; top:12px; left:12px; width:270px; padding:13px 15px 12px;
+        background:var(--panel); border:1px solid var(--line); border-radius:9px;
+        backdrop-filter:blur(9px); user-select:none; z-index:10; }
+  #ui h1 { margin:0 0 1px; font-size:13px; letter-spacing:.09em; text-transform:uppercase; color:#fff; }
+  #ui .sub { color:var(--dim); font-size:11px; margin-bottom:10px; }
+
+  #phase { color:#ffd479; font-size:11.5px; letter-spacing:.04em; height:1.4em; }
+  #clock { color:#fff; font-size:20px; font-variant-numeric:tabular-nums; letter-spacing:.02em; }
+  #clock small { color:var(--dim); font-size:11px; }
+
+  /* labels get their own strip ABOVE the slider: overlaying them on the
+     range input put the thumb and track on top of the text */
+  .tline { position:relative; height:30px; margin:2px 0 0; }
+  .marks { position:absolute; left:0; right:0; top:0; height:10px; }
+  /* 7 px hover target with a 1 px tick drawn down its middle */
+  .marks i { position:absolute; bottom:0; width:7px; height:8px; margin-left:-3px; cursor:default;
+             background:linear-gradient(to right, transparent 3px, rgba(150,170,200,.5) 3px,
+                                        rgba(150,170,200,.5) 4px, transparent 4px); }
+
+  input[type=range] { width:100%; accent-color:#e0533d; height:20px; margin:0; }
+  .tline input[type=range] { position:absolute; left:0; right:0; bottom:0; }
+
+  .row { display:flex; align-items:center; justify-content:space-between; margin:8px 0 2px; }
+  .row span { color:var(--dim); }
+  .row output { color:#fff; font-variant-numeric:tabular-nums; }
+  .btns { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+  button { font:inherit; color:var(--ink); background:rgba(255,255,255,.05);
+           border:1px solid var(--line); border-radius:6px; padding:6px 9px; cursor:pointer; }
+  button:hover { background:rgba(255,255,255,.12); }
+  button.on { background:#c8202a; border-color:#e8384a; color:#fff; }
+  .btns button { flex:1 1 auto; }
+
+  #hud { position:fixed; right:12px; top:12px; text-align:right; font-size:11px;
+         color:var(--dim); z-index:10; }
+  #hud b { color:#fff; font-weight:400; }
+  #tele { position:fixed; right:12px; bottom:12px; text-align:right; font-size:11px; z-index:10;
+          background:var(--panel); border:1px solid var(--line); border-radius:7px; padding:8px 11px; }
+  #tele div { color:var(--dim); }
+  #tele b { color:#9fe0a0; font-weight:400; font-variant-numeric:tabular-nums; }
+
+  #load { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+          background:#000; z-index:50; color:var(--dim); letter-spacing:.14em; }
+  #load.done { opacity:0; pointer-events:none; transition:opacity .6s; }
+  #err { color:#ff7b7b; max-width:70ch; text-align:center; margin-top:14px; letter-spacing:0; }
+</style>
+</head>
+<body>
+
+<div id="ui">
+  <h1>Vostok&nbsp;1 &middot; Launch &amp; Orbit</h1>
+  <div class="sub">12 April 1961 &middot; 06:07 UTC &middot; Baikonur</div>
+
+  <div id="clock">T&minus;<small>00:00</small></div>
+  <div id="phase">&nbsp;</div>
+
+  <div class="tline">
+    <div class="marks" id="marks"></div>
+    <input type="range" id="seek" min="0" max="1000" value="0">
+  </div>
+
+  <div class="row"><span>altitude</span><output id="alt">0 km</output></div>
+  <div class="row"><span>velocity</span><output id="vel">0 m/s</output></div>
+  <div class="row"><span>acceleration</span><output id="acc">0.00 g</output></div>
+  <div class="row"><span>mass</span><output id="mass">287.0 t</output></div>
+  <div class="row"><span>range to pad</span><output id="range">0 km</output></div>
+  <div class="row"><span>time compression</span><output id="comp">68&times;</output></div>
+  <div class="btns" id="rateBtns">
+    <button data-rate="0.25">0.25&times;</button>
+    <button data-rate="0.5">0.5&times;</button>
+    <button data-rate="1" class="on">1&times;</button>
+    <button data-rate="2">2&times;</button>
+  </div>
+
+  <div class="btns">
+    <button id="play">&#9199; play</button>
+    <button id="restart">restart</button>
+  </div>
+  <div class="row"><span>camera</span><output id="camMode">auto</output></div>
+  <div class="btns">
+    <button id="auto">auto cam</button>
+    <button id="free">free look</button>
+  </div>
+</div>
+
+<div id="hud">Earth imagery: NASA Blue Marble<br><a href="assets/textures/earth/SOURCES.md">sources &amp; licence</a><br><a href="index.html">&#9664; model viewer</a></div>
+
+<div id="tele">
+  <div>orbit period <b id="tOrbit">—</b></div>
+  <div>inclination <b id="tInc">—</b></div>
+  <div>perigee &times; apogee <b id="tPeAp">—</b></div>
+  <div>sky darkness <b id="tDark">0%</b></div>
+</div>
+
+<div id="load">PREPARING LAUNCH<div id="err"></div></div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js" } }
+</script>
+<script>
+  function showErr(m) {
+    var el = document.getElementById('err');
+    if (el) el.textContent += (el.textContent ? '\n' : '') + m;
+  }
+  addEventListener('error', function (e) {
+    showErr('ERROR: ' + (e.message || e.type) + (e.filename ? '  @ ' + e.filename + ':' + e.lineno : ''));
+  }, true);
+  addEventListener('unhandledrejection', function (e) {
+    showErr('REJECTED: ' + ((e.reason && e.reason.message) || e.reason));
+  });
+</script>
+<script type="module" src="./launch.js"></script>
+</body>
+</html>
