@@ -13,6 +13,18 @@ OUT = '/tmp/vostok-1-new.glb'
 Z0 = 32.05                     # capsule base (mates with Block-E top)
 
 bpy.ops.wm.open_mainfile(filepath=BLEND)
+# textures may be packed inside the blend from an older save - force them
+# back to the current files on disk before anything is exported
+TEXDIR = '/home/tkleisas/Projects/bokontep.gr/three/assets/textures/'
+for img in bpy.data.images:
+    try:
+        if img.packed_file:
+            img.unpack(method='REMOVE')   # drop the pack, keep the filepath
+        img.filepath = TEXDIR + img.name  # the blend used to point at a stale
+        img.reload()                      # temp dir - repoint at the project
+        print('reloaded image from disk:', img.name)
+    except Exception as e:
+        print('image reload skipped:', img.name, e)
 
 # ---- materials ----------------------------------------------------------
 def mat(name, rgb, metal=0.0, rough=0.6):
@@ -222,7 +234,5 @@ print('CAPSULE verts:', len(cap.data.vertices), 'dim:', tuple(round(v, 2) for v 
 
 # ---- save the source and export the whole stack -------------------------
 bpy.ops.wm.save_mainfile(filepath=BLEND)
-bpy.ops.export_scene.gltf(filepath=OUT, export_format='GLB')
-print('EXPORTED', OUT)
 bpy.ops.export_scene.gltf(filepath=OUT, export_format='GLB')
 print('EXPORTED', OUT)
