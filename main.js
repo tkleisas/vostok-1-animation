@@ -5,7 +5,7 @@ import { RoomEnvironment } from './vendor/environments/RoomEnvironment.js';
 
 const GLB = './assets/vostok-1.glb';
 
-// Rocket is ~38.6 m tall, standing along +Y (glTF is Y-up).
+// The 8K72K stack is 38.36 m tall, standing along +Y (glTF is Y-up).
 const ROCKET_MID = 19.4;
 
 /* ------------------------------------------------------------------ scene */
@@ -13,7 +13,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'hi
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.25;
+renderer.toneMappingExposure = 0.95;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 document.body.appendChild(renderer.domElement);
 
@@ -22,7 +22,7 @@ scene.background = new THREE.Color(0x0a0e14);
 // metals (lattice truss, engine bay) need an environment to read correctly
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-scene.environmentIntensity = 0.8;
+scene.environmentIntensity = 0.45;
 
 const camera = new THREE.PerspectiveCamera(36, innerWidth / innerHeight, 0.5, 900);
 camera.position.set(34, ROCKET_MID + 11, 58);
@@ -36,13 +36,13 @@ controls.maxDistance = 240;
 controls.autoRotate = true;
 controls.autoRotateSpeed = 0.85;
 
-const key = new THREE.DirectionalLight(0xfff4e6, 3.1);
+const key = new THREE.DirectionalLight(0xfff4e6, 2.3);
 key.position.set(38, 62, 40);
 scene.add(key);
-const rim = new THREE.DirectionalLight(0xbdd4ff, 1.7);
+const rim = new THREE.DirectionalLight(0xbdd4ff, 1.15);
 rim.position.set(-40, 26, -46);
 scene.add(rim);
-const under = new THREE.DirectionalLight(0xffd9b0, 0.6);
+const under = new THREE.DirectionalLight(0xffd9b0, 0.35);
 under.position.set(6, -30, 14);
 scene.add(under);
 
@@ -65,6 +65,7 @@ loader.load(GLB, (gltf) => {
 
   let tris = 0;
   root.traverse((o) => {
+    if (o.name) named.set(o.name, o);
     if (!o.isMesh) return;
     o.castShadow = o.receiveShadow = true;
     o.userData.tris = o.geometry.index
@@ -74,7 +75,6 @@ loader.load(GLB, (gltf) => {
     // a per-mesh clone so highlighting one part does not tint the shared material
     o.material = o.material.clone();
     if (o.material.emissive) o.material.emissive.setHex(0x000000);
-    named.set(o.name, o);
   });
   document.getElementById('poly').textContent = tris.toLocaleString();
 
@@ -117,7 +117,7 @@ function buildSeparationPlan() {
 
   // 4 boosters + 4 fins fly outward radially, a little staggered.
   // Distances are tuned so the fully separated stack still fits the default view.
-  const BOOST_D = 11, FIN_D = 15;
+  const BOOST_D = 11, FIN_D = BOOST_D;
   for (let i = 1; i <= 4; i++) {
     const b = named.get('Booster_' + i);
     const f = named.get('Fin_' + i);
@@ -134,11 +134,15 @@ function buildSeparationPlan() {
   }
 
   const UP = new THREE.Vector3(0, 1, 0);
-  addPart('Stage2',          UP,  8, 0.40);
-  addPart('Lattice_Frame',   UP, 12, 0.58);
-  addPart('BlockE_Stage3',   UP, 16, 0.74);
-  addPart('Vostok_Capsule',  UP, 19, 0.80);
-  addPart('Payload_Fairing', UP, 22, 0.93);
+  const DOWN = new THREE.Vector3(0, -1, 0);
+  /* Block A goes first, then its truss; Block E and the spacecraft climb
+     away.  The two shroud petals peel sideways, as the pyrotechnics did. */
+  addPart('Core_Stage1',      DOWN, 10, 0.36);
+  addPart('Lattice_Frame',    DOWN, 10, 0.52);
+  addPart('BlockE_Stage3',    UP,   15, 0.66);
+  addPart('Vostok_Capsule',   UP,   19, 0.80);
+  addPart('Payload_Fairing_L', new THREE.Vector3(1, 0.28, 0.10), 16, 0.56);
+  addPart('Payload_Fairing_R', new THREE.Vector3(-1, 0.28, -0.10), 16, 0.56);
 }
 
 /* ------------------------------------------------------------- animation */
@@ -183,9 +187,11 @@ const fairBtn = document.getElementById('fair');
 let fairingOn = true;
 function toggleFairing() {
   fairingOn = !fairingOn;
-  if (named.has('Payload_Fairing')) named.get('Payload_Fairing').visible = fairingOn;
+  for (const n of ['Payload_Fairing_L', 'Payload_Fairing_R']) {
+    if (named.has(n)) named.get(n).visible = fairingOn;
+  }
   fairBtn.classList.toggle('on', !fairingOn);
-  fairBtn.textContent = 'fairing: ' + (fairingOn ? 'on' : 'off');
+  fairBtn.textContent = 'shroud: ' + (fairingOn ? 'on' : 'off');
 }
 fairBtn.onclick = toggleFairing;
 
@@ -215,14 +221,22 @@ renderer.domElement.addEventListener('pointermove', (e) => {
 renderer.domElement.addEventListener('pointerleave', () => { pointerInside = false; });
 
 const LABELS = {
-  Core_Stage1: 'Stage 1 core (Блок-I)',
-  Booster_1: 'Booster 1 (Блок-I)', Booster_2: 'Booster 2', Booster_3: 'Booster 3', Booster_4: 'Booster 4',
+  Core_Stage1: 'Block A — core stage',
+  Core_Engines: 'RD-108 — 4 chambers + 4 verniers',
+  Core_Details: 'Core panel seams, raceway & hatches',
+  Core_Markings: 'ВОСТОК livery',
+  Booster_1: 'Block B — strap-on 1', Booster_2: 'Block V — strap-on 2',
+  Booster_3: 'Block G — strap-on 3', Booster_4: 'Block D — strap-on 4',
   Fin_1: 'Fin 1', Fin_2: 'Fin 2', Fin_3: 'Fin 3', Fin_4: 'Fin 4',
-  Stage2: 'Stage 2',
-  Lattice_Frame: 'Lattice / truss frame',
-  BlockE_Stage3: 'Block E — 3rd stage',
-  Payload_Fairing: 'Payload fairing + escape tower',
-  Vostok_Capsule: 'Vostok 3KA — Gagarin’s capsule',
+  Lattice_Frame: 'Open interstage truss',
+  BlockE_Stage3: 'Block E — third stage (RD-0109)',
+  Payload_Fairing_L: 'Payload shroud — left petal',
+  Payload_Fairing_R: 'Payload shroud — right petal',
+  Vostok_Capsule: 'Vostok 3KA — Gagarin’s spacecraft',
+  Vostok_SA: 'Descent module (SA) — 2.3 m sphere',
+  Vostok_PA: 'Instrument module (PA) — TDU-1',
+  Vostok_SA_HeatShield: 'Reentry heat shield',
+  Vostok_SA_Details: 'Hatch, Vzor window & antennas',
 };
 
 function updateHover() {
@@ -238,9 +252,9 @@ function updateHover() {
     hovered = obj;
     if (hovered && hovered.material.emissive) hovered.material.emissive.setHex(0x2a0d10);
   }
-  hoverEl.innerHTML = obj
-    ? '<b>' + (LABELS[obj.name] || obj.name) + '</b>'
-    : '—';
+  const label = obj && (LABELS[obj.name] ||
+    (obj.parent && LABELS[obj.parent.name]) || obj.name);
+  hoverEl.innerHTML = obj ? '<b>' + label + '</b>' : '—';
 }
 
 /* ---------------------------------------------- adaptive framing */

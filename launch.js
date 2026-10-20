@@ -25,32 +25,34 @@ const TEX = './assets/textures/earth/';
 /* ==================================================================== *
  *  mission timeline
  * ==================================================================== */
-/* The clock runs a couple of minutes past the 108-minute landing so the
-   capsule can settle on the steppe before the playback ends. */
-const MISSION_END = 110 * 60 + 20;   // s of mission clock shown
-/* the orbit actually flown: a slight Block-E overburn put Vostok 1 into
-   181 x 327 km with a period of 89.34 min - higher than the planned
-   175 x 302 km, and the figures TASS announced */
-const ORBIT_PERIOD = 89.34 * 60;
+/* The clock runs a little past the 106-minute landing so the capsule
+   and Gagarin can settle on the steppe before the playback ends. */
+const MISSION_END = 106 * 60 + 40;   // 10:53:40 MSK, just after Gagarin is down
+/* the orbit actually flown: an overburn of the Block A core put Vostok 1
+   into 181 x 327 km, higher than the planned 175 x 302 km.  The period is
+   the 89.1 min in the FAI/NASA record, not the rounded 90 min often quoted. */
+const ORBIT_PERIOD = 89.1 * 60;
 const T_IGNITE = 0.055, T_LIFT = 0.115;
 const DURATION = 95;                          // s of real playback for the whole mission
 const T_REVEAL_A = 0.200, T_REVEAL_B = 0.560;
 
-/* Ascent events on the real Vostok 1 clock: launch 09:06:59.7 MSK, the
-   four strap-ons burn out and drop at T+119 s (Gerchik via
-   russianspaceweb, ESA), the payload shroud is jettisoned at T+154 s
-   (Zak's planned figure; ESA lists T+156), the core stage separates at
-   T+299 s, and the Block-E cuts off at T+676 s with the spacecraft
-   letting go at 09:18:28 MSK - T+688 s. */
+/* Ascent events on the real Vostok 1 clock (launch 09:06:59.7 MSK):
+   the four strap-ons drop at T+119 s, the shroud at T+154 s, Block A at
+   T+299 s, Block E cuts off at T+676 s and the spacecraft separates at
+   09:18:28 MSK - T+688 s. */
 const EV_BOOST_SEP = 119, EV_FAIR_SEP = 154, EV_CORE_SEP = 299;
 const EV_ORBIT = 676, EV_SPACECRAFT_SEP = 688;
-/* Descent events: the TDU-1 retro engine fires at 10:25 MSK (T+78 min)
-   for ~40 s, the descent sphere meets the sensible atmosphere around
-   T+90 min, decelerating at up to ~8 g, the main parachute opens near
-   7 km, and Gagarin's capsule touches down near Smelovka in the Saratov
-   region at 10:55 MSK - T+108 min. */
-const EV_RETRO = 4680, EV_RETRO_END = 4720, EV_ENTRY = 5300;
-const EV_PLASMA_PK = 5750, EV_CHUTE = 6250, EV_TOUCH = 6480;
+/* Descent, following the post-flight report and RussianSpaceWeb:
+   TDU-1 retrofire 10:25:00 (78 min), PA/instrument module finally
+   separates 10:35:00 (88 min), entry interface ~10:36, peak heating
+   ~10:39-40, Gagarin ejects at 7 km at 10:42:00 (95 min), the descent
+   module's main canopy opens at 2.5 km, the capsule lands 10:48:00
+   (101 min) and Gagarin lands 10:53:00 (106 min) - not the old
+   108-minute figure, which was a record claim. */
+const EV_RETRO = 4680, EV_RETRO_END = 4719;
+const EV_PA_SEP = 5280, EV_ENTRY = 5340;
+const EV_PLASMA_PK = 5560, EV_EJECT = 5700, EV_GAG_CHUTE = 5720;
+const EV_CHUTE = 5820, EV_TOUCH = 6060, EV_GAG_TOUCH = 6360;
 
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const sstep = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0)); return t * t * (3 - 2 * t); };
@@ -83,16 +85,20 @@ function keyframe(t, pts) {
  *   - propellant burning off continuously, and
  *   - whole stages vanishing INSTANTLY when jettisoned.
  * Component masses are balanced so what remains after the Block-E lets go
- * is the 4.7 t Vostok spacecraft: 287 t liftoff = 158.5 t strap-on
- * propellant + 13.8 t strap-on structure + 94.2 t core propellant + 8.5 t
- * core structure + 0.55 t shroud + 5.5 t Block-E propellant + 1.25 t
- * Block-E structure + 4.7 t spacecraft.
+ * is the 4.725 t Vostok spacecraft: 286.9 t liftoff = 158.36 t strap-on
+ * propellant + 14.84 t strap-on structure + 93.60 t core propellant +
+ * 6.80 t core structure + 0.80 t shroud + 6.335 t Block-E propellant +
+ * 1.44 t Block-E structure + 4.725 t spacecraft.
  * -------------------------------------------------------------------- */
-const M0 = 287.0;
-const M_BO_PROP = 158.5, M_BO_DRY = 13.8;     // 4 x RD-107 strap-ons
-const M_CO_PROP = 94.2,  M_CO_DRY = 8.5;      // RD-108 core
-const M_3E_PROP = 5.5,   M_3E_DRY = 1.25;     // Block-E
-const M_FAIR = 0.55;                          // payload shroud
+/* Stage masses from the 8K72K record: strap-ons 4 x 43.3 t (3.71 t dry),
+   core 100.4 t (6.8 t dry), Block E 7.775 t (1.44 t dry), shroud 0.8 t,
+   spacecraft 4.725 t.  The sum is 286.9 t; the round 287 t figure is the
+   usual quoted launch mass. */
+const M0 = 286.9;
+const M_BO_PROP = 158.36, M_BO_DRY = 14.84;   // 4 x RD-107 strap-ons
+const M_CO_PROP = 93.60,  M_CO_DRY = 6.80;    // RD-108 core
+const M_3E_PROP = 6.335,  M_3E_DRY = 1.44;    // Block-E
+const M_FAIR = 0.80;                          // payload shroud
 function massTonnes(sec) {
   let m = M0;
   m -= M_BO_PROP * clamp(sec / 118);
@@ -125,15 +131,19 @@ const T_FAIR_SEP = tAtMission(EV_FAIR_SEP);
 const T_CORE_SEP = tAtMission(EV_CORE_SEP);
 const T_ORBIT = tAtMission(EV_ORBIT);
 const T_SEP = tAtMission(EV_SPACECRAFT_SEP);
-/* The Block-E's RD-0109 was hot-staged: it fired at ~T+294 s, through the
+/* The Block-E's RD-0109 was hot-staged: it fired at ~T+296 s, through the
    open interstage truss, just before the core burned out and let go. */
-const T_BLE_IGN = tAtMission(294);
-const T_MAXQ = tAtMission(55);          // max-Q near T+55 s, ~11 km
+const T_BLE_IGN = tAtMission(296);
+const T_MAXQ = tAtMission(62);          // max-Q near T+62 s, ~13 km
 const T_RETRO = tAtMission(EV_RETRO);
 const T_RETRO_END = tAtMission(EV_RETRO_END);
+const T_PA_SEP = tAtMission(EV_PA_SEP);
 const T_ENTRY = tAtMission(EV_ENTRY);
+const T_EJECT = tAtMission(EV_EJECT);
+const T_GAG_CHUTE = tAtMission(EV_GAG_CHUTE);
 const T_CHUTE = tAtMission(EV_CHUTE);
 const T_TOUCH = tAtMission(EV_TOUCH);
+const T_GAG_TOUCH = tAtMission(EV_GAG_TOUCH);
 
 /* --- readouts ----------------------------------------------------------- *
  * Keyed on the MISSION clock through tAtMission so the numbers can never
@@ -145,67 +155,71 @@ const T_TOUCH = tAtMission(EV_TOUCH);
  * anchors are interpolations for display, not telemetry. */
 const ALT_KM = [
   [T_LIFT, 0], [tAtMission(10), 0.3], [tAtMission(20), 1.4], [tAtMission(30), 3],
-  [tAtMission(40), 5.5], [tAtMission(60), 13], [tAtMission(85), 26],
+  [tAtMission(40), 5.5], [tAtMission(62), 13], [tAtMission(85), 26],
   [tAtMission(100), 36], [T_BOOST_SEP, 47], [T_FAIR_SEP, 68],
   [tAtMission(200), 95], [tAtMission(250), 122], [T_CORE_SEP, 145],
   [tAtMission(400), 168], [tAtMission(500), 186], [T_ORBIT, 186],
-  /* on the real 181 x 327 km orbit the altitude breathes up to apogee half
-     a period after insertion (~T+3356 s), then the TDU-1 burn at T+4680 s
-     drops the perigee into the atmosphere: entry interface at 120 km around
-     T+5300 s, a steep decelerating fall, the parachute near 7 km, and the
-     steppe at T+6480 s */
-  [tAtMission(3356), 327], [T_RETRO, 252], [T_RETRO_END, 250],
-  [T_ENTRY, 120], [tAtMission(5500), 82], [tAtMission(5750), 42],
-  [tAtMission(6000), 15], [T_CHUTE, 7], [tAtMission(6400), 1.2], [T_TOUCH, 0], [1, 0],
+  /* 181 x 327 km: apogee half a period after insertion (T+3364 s), then
+     the TDU-1 burn at T+4680 s drops the perigee into the atmosphere.
+     The PA finally separates at 10:35, entry interface follows at 10:36,
+     and the capsule decelerates from ~60 km to ejection at 7 km. */
+  [tAtMission(3364), 327], [T_RETRO, 252], [T_RETRO_END, 250],
+  [T_PA_SEP, 150], [T_ENTRY, 120], [tAtMission(5480), 62],
+  [tAtMission(5560), 30], [T_EJECT, 7], [T_CHUTE, 2.5],
+  [tAtMission(5980), 0.8], [T_TOUCH, 0], [1, 0],
 ];
 const VEL_MS = [
   [T_LIFT, 0], [tAtMission(10), 60], [tAtMission(20), 140], [tAtMission(30), 240],
-  [tAtMission(40), 360], [tAtMission(60), 620], [tAtMission(85), 1050],
+  [tAtMission(40), 360], [tAtMission(62), 650], [tAtMission(85), 1050],
   [tAtMission(100), 1350], [T_BOOST_SEP, 1650], [T_FAIR_SEP, 2400],
   [tAtMission(200), 3200], [tAtMission(250), 4300], [T_CORE_SEP, 5400],
   [tAtMission(400), 6300], [tAtMission(500), 6900], [T_ORBIT, 7840],
-  /* the TDU-1 shaves off ~150 m/s, the atmosphere does the rest: subsonic
-     below ~10 km and ~6 m/s under the canopy */
-  [T_RETRO, 7680], [T_RETRO_END, 7530], [T_ENTRY, 7560], [tAtMission(5500), 7100],
-  [tAtMission(5750), 1600], [tAtMission(6000), 260], [T_CHUTE, 70],
-  [tAtMission(6400), 7], [T_TOUCH, 4], [1, 0],
+  /* the TDU-1 shaves off ~150 m/s; the atmosphere does the rest, taking the
+     capsule subsonic by ~10 km and down to ~30 m/s under the main canopy */
+  [T_RETRO, 7680], [T_RETRO_END, 7530], [T_PA_SEP, 7520], [T_ENTRY, 7480],
+  [tAtMission(5480), 6100], [tAtMission(5560), 3200], [T_EJECT, 180],
+  [T_CHUTE, 30], [tAtMission(5980), 8], [T_TOUCH, 5], [1, 0],
 ];
-/* Proper acceleration - what the crew feels: ~0.6 g off the pad, the
-   3-4 g Gagarin reported by T+60 s, peaking ~4.5 g at strap-on burnout,
-   sagging when the boosters let go, climbing to ~3.3 g at core cutoff,
+/* Proper acceleration - what the crew feels: ~0.6 g off the pad, ~2.7 g
+   by T+60 s, peaking ~4.5 g at strap-on burnout, sagging when the
+   boosters let go, climbing to ~3.1 g at core cutoff,
    then the long low-thrust Block-E burn below 1 g until cutoff. After the
    orbital free-fall the retro burn nudges ~0.3 g, then the re-entry
    builds to the ~8 g Gagarin reported, easing through the parachute
    opening shock to 1 g under the canopy. */
 const ACC_G = [
-  [T_LIFT, 0], [tAtMission(5), 0.60], [tAtMission(30), 0.95], [tAtMission(60), 1.65],
-  [tAtMission(90), 2.80], [T_BOOST_SEP - 0.004, 4.50], [T_BOOST_SEP + 0.004, 0.50],
-  [tAtMission(160), 0.70], [tAtMission(220), 1.60], [tAtMission(270), 2.70],
-  [T_CORE_SEP - 0.004, 3.30], [T_CORE_SEP + 0.004, 0.38],
-  [tAtMission(450), 0.62], [T_ORBIT - 0.004, 0.85], [T_ORBIT + 0.004, 0.02],
+  [T_LIFT, 0], [tAtMission(5), 0.60], [tAtMission(30), 1.50], [tAtMission(62), 2.70],
+  [tAtMission(95), 3.70], [T_BOOST_SEP - 0.004, 4.50], [T_BOOST_SEP + 0.004, 0.90],
+  [tAtMission(160), 1.50], [tAtMission(220), 2.20], [tAtMission(270), 2.80],
+  [T_CORE_SEP - 0.004, 3.10], [T_CORE_SEP + 0.004, 0.45],
+  [tAtMission(450), 0.60], [T_ORBIT - 0.004, 0.75], [T_ORBIT + 0.004, 0.02],
   [T_RETRO - 0.002, 0], [T_RETRO + 0.002, 0.30], [T_RETRO_END - 0.002, 0.30],
-  [T_RETRO_END + 0.002, 0], [tAtMission(5400), 0.15], [tAtMission(5600), 3.5],
-  [tAtMission(5750), 8.2], [tAtMission(5900), 4.0], [tAtMission(6100), 1.2],
-  [T_CHUTE - 0.002, 1.0], [T_CHUTE + 0.002, 3.0], [tAtMission(6320), 1.0], [1, 1],
+  [T_RETRO_END + 0.002, 0], [T_PA_SEP, 0.10],
+  [tAtMission(5480), 3.20], [tAtMission(5560), 8.50], [tAtMission(5620), 4.00],
+  [T_EJECT, 1.00], [T_CHUTE - 0.002, 1.0], [T_CHUTE + 0.002, 3.5],
+  [tAtMission(5900), 1.0], [1, 1],
 ];
 
+/* [normalised timeline position, label, real mission second] */
 const PHASES = [
-  [0.000, 'T-00:10  pre-launch'],
-  [T_IGNITE, 'ignition  -  32 chambers'],
-  [T_LIFT, 'lift-off  -  "Poyekhali!"'],
-  [T_MAXQ, 'max dynamic pressure'],
-  [T_BOOST_SEP, 'strap-on separation  -  Korolev cross'],
-  [T_FAIR_SEP, 'payload shroud jettison'],
-  [T_BLE_IGN, 'Block-E ignition  -  hot staging'],
-  [T_CORE_SEP, 'core separation  -  Block-E burn'],
-  [T_ORBIT, 'orbital insertion  -  181 x 327 km'],
-  [T_SEP, 'Vostok 1 in orbit'],
-  [T_RETRO, 'retrofire  -  TDU-1 burn'],
-  [T_ENTRY, 'entry interface  -  120 km'],
-  [tAtMission(5750), 'peak heating  -  8 g'],
-  [T_CHUTE, 'parachute deployment'],
-  [tAtMission(6270), 'Gagarin ejects'],
-  [T_TOUCH, 'touchdown  -  Saratov region'],
+  [0.000, 'T-00:10  pre-launch', -10],
+  [T_IGNITE, 'ignition  -  32 chambers', -2],
+  [T_LIFT, 'lift-off  -  "Poyekhali!"', 0],
+  [T_MAXQ, 'max dynamic pressure', 62],
+  [T_BOOST_SEP, 'strap-on separation  -  Korolev cross', 119],
+  [T_FAIR_SEP, 'payload shroud jettison', 154],
+  [T_BLE_IGN, 'Block-E ignition  -  hot staging', 296],
+  [T_CORE_SEP, 'core separation  -  Block-E burn', 299],
+  [T_ORBIT, 'orbital insertion  -  181 x 327 km', 676],
+  [T_SEP, 'Vostok 1 in orbit', 688],
+  [T_RETRO, 'retrofire  -  TDU-1 burn', 4680],
+  [T_PA_SEP, 'instrument module separation', 5280],
+  [T_ENTRY, 'entry interface  -  120 km', 5340],
+  [tAtMission(EV_PLASMA_PK), 'peak heating  -  8.5 g', 5560],
+  [T_EJECT, 'Gagarin ejects  -  7 km', 5700],
+  [T_CHUTE, 'capsule parachute  -  2.5 km', 5820],
+  [T_TOUCH, 'capsule touchdown  -  10:48', 6060],
+  [T_GAG_TOUCH, 'Gagarin touchdown  -  Saratov', 6360],
 ];
 /* --- world altitude ---------------------------------------------------- *
  * The climb is staged in VEHICLE-scale units so the pad visibly falls away:
@@ -246,12 +260,12 @@ const EARTH_R = ORBIT_ALT / 0.0275;                      // 5455
    rather than a spacecraft in low orbit. Keep the same exaggeration as the
    launch scene (it has to match the pad scale) but cut it hard: the vehicle is
    now a small object just above the limb and the planet dominates. */
-const ORBIT_CAP_SCALE = 34;   // ~25 px on screen: a small craft over a vast planet
+const ORBIT_CAP_SCALE = 46;   // ~30 px on screen: a small craft over a vast planet
 const earthRadius = (t) => lerp(6000, EARTH_R, sstep(T_REVEAL_A, T_REVEAL_B, t));
 /* Above roughly 30 km the vehicle is out of the dense air and the sky starts
    to go black. Keyed to real ALTITUDE, not the timeline parameter, so it stays
    correct no matter how the climb curve is retimed. */
-const skyDark = (t) => sstep(30, 130, keyframe(t, ALT_KM));
+const skyDark = (t) => sstep(12, 80, keyframe(t, ALT_KM));
 /* --- gravity turn ------------------------------------------------------ *
  * The R-7 pitches over early and hard: ~20 deg from vertical by T+40 s,
  * ~63 deg at strap-on separation, ~72 when the shroud goes, and by core
@@ -300,7 +314,7 @@ const orbitAngle = downAngle;
 /* downrange in real kilometres, for the range readout */
 /* slant range to the pad at the moment of retrofire (great-circle arc of
    the ground track): after the burn the readout converges from here to the
-   landing site's real ~800 km */
+   landing site's real ~1,400 km */
 const RANGE_AT_RETRO = (() => {
   const w = ((downAngle(T_RETRO) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
   return Math.hypot(keyframe(T_RETRO, ALT_KM),
@@ -325,9 +339,9 @@ const earthSpin = (t) => (missionTime(t) / 3600) * (15 * Math.PI / 180);
  * plane (y = -BLOCK_H), mirroring the ascent's worldAlt mechanism.
  * ---------------------------------------------------------------------- */
 const LAND_ALT = [
-  [T_RETRO, 150], [T_ENTRY, 120], [tAtMission(5500), 75], [tAtMission(5750), 34],
-  [tAtMission(6000), 12], [T_CHUTE, 6.5], [tAtMission(6350), 2.8],
-  [tAtMission(6460), 0.4], [T_TOUCH, 0], [1, 0],
+  [T_RETRO, 150], [T_PA_SEP, 150], [T_ENTRY, 120], [tAtMission(5480), 62],
+  [tAtMission(5560), 30], [T_EJECT, 7], [T_CHUTE, 2.5],
+  [tAtMission(5980), 0.8], [T_TOUCH, 0], [1, 0],
 ];
 function landAlt(t) {
   if (t <= LAND_ALT[0][0]) return LAND_ALT[0][1];
@@ -356,18 +370,20 @@ function landPose(t, out) {
   fdA.y *= 0.25;                          // nearly level flight at retrofire
   fdA.normalize();
   const s = sstep(T_RETRO, T_TOUCH, t);
-  /* the capsule rests on its aft end: its baked centre sits ~2.35 units
-     above the base, so the centre rides that much above the steppe */
+  /* The capsule group's origin is the SA/PA interface: the descent
+     module's heat shield sits only ~0.04 units below it.  Put that face on
+     the steppe, not the old whole-spacecraft centre 2.28 units higher
+     (which left the capsule visibly floating).  The landing distance is
+     compressed for framing - the real capsule and Gagarin were 1.5 km apart. */
   out.set(posA.x + fdA.x * LAND_DIST * s,
-          -BLOCK_H + 2.35 + landAlt(t),
+          -BLOCK_H + 0.04 + landAlt(t),
           posA.z + fdA.z * LAND_DIST * s);
   return out;
 }
-/* Gagarin ejected at ~7 km and came down under his personal parachute,
-   landing a couple of minutes after the capsule and some 25 m to the side.
-   His path tracks the capsule's descent up to the ejection, then drifts
-   sideways on a slightly stretched clock. */
-const T_GAG_TOUCH = tAtMission(6540);
+/* Gagarin ejected at 7 km at 10:42 and landed under his personal canopy at
+   10:53, about 1.5 km from the descent module (10:48).  His path tracks the
+   capsule's descent up to the ejection, then drifts sideways on a stretched
+   clock; the separation is compressed to keep both in one camera frame. */
 const _gp0 = new THREE.Vector3(), _gp1 = new THREE.Vector3(), _gp2 = new THREE.Vector3();
 function gagPose(t, out) {
   const posA = orbitCapPos(T_RETRO, _gp0);
@@ -375,15 +391,24 @@ function gagPose(t, out) {
   fdA.y *= 0.25;
   fdA.normalize();
   const side = _gp2.set(-fdA.z, 0, fdA.x);
-  const capS = sstep(T_RETRO, T_TOUCH, T_CHUTE);   // path fraction at ejection
-  const s = sstep(T_CHUTE, T_GAG_TOUCH, t);
+  const capS = sstep(T_RETRO, T_TOUCH, T_EJECT);   // path fraction at ejection
+  const s = sstep(T_EJECT, T_GAG_TOUCH, t);
   const along = LAND_DIST * lerp(capS, 1, s);
-  /* his descent on a longer clock: sample the altitude profile remapped so
-     it reaches zero at his own touchdown */
-  const tRemap = T_RETRO + (t - T_RETRO) * (T_TOUCH - T_RETRO) / (T_GAG_TOUCH - T_RETRO);
-  out.set(posA.x + fdA.x * along + side.x * 15 * s,
-          -BLOCK_H + landAlt(Math.min(1, tRemap)),
-          posA.z + fdA.z * along + side.z * 15 * s);
+  /* From ejection he is on his own canopy: 7 scene units above the steppe
+     at 10:42, down to zero at 10:53.  (The old code reused the capsule's
+     whole-entry altitude curve, which left him at 150 km at ejection.) */
+  const gagAlt = 7 * (1 - sstep(T_EJECT, T_GAG_TOUCH, t));
+  out.set(posA.x + fdA.x * along + side.x * 45 * s,
+          -BLOCK_H + gagAlt,
+          posA.z + fdA.z * along + side.z * 45 * s);
+  /* The seat kicks him clear of the 2.3 m sphere so he is visible beside
+     the capsule just after ejection; this offset fades before touchdown,
+     otherwise he would land still hovering 2.5 units up. */
+  const ej = sstep(T_EJECT, T_EJECT + 0.005, t) *
+             (1 - sstep(T_EJECT + 0.005, T_EJECT + 0.032, t));
+  out.x += side.x * 4.5 * ej;
+  out.z += side.z * 4.5 * ej;
+  out.y += 2.5 * ej;
   return out;
 }
 
@@ -663,9 +688,90 @@ function lattice(p0, p1, w, mat, bays, parent = pad) {
 const DECK_H = 2.4;                       // deck slab thickness
 const BOD_H = BLOCK_H - DECK_H;            // 13.6: walls from under the deck to grade
 const SHADOW = new THREE.MeshStandardMaterial({ color: 0x14130f, roughness: 1 });
-const TR_W = 20, TR_D = 30;              // clear trench opening
-const BZ = -BOD_H / 2 - DECK_H;           // wall centre height
+const TR_W = 20, TR_D = 30;                // clear trench opening
+const BZ = -BOD_H / 2 - DECK_H;            // wall centre height
+const padWhite = new THREE.MeshStandardMaterial({ color: 0xc9cdcb, roughness: 0.85 });
+const asphalt = new THREE.MeshStandardMaterial({ color: 0x2c2e2e, roughness: 0.98 });
+const hazardRed = new THREE.MeshStandardMaterial({ color: 0x9d2a22, roughness: 0.8 });
+const lamp = new THREE.MeshStandardMaterial({ color: 0xfff3d0, emissive: 0xffe9b0, emissiveIntensity: 1.9, roughness: .4 });
+const glassDark = new THREE.MeshStandardMaterial({ color: 0x11181c, roughness: 0.35, metalness: 0.4 });
 
+/* small mesh helpers for the pad */
+function cyl(r1, r2, h, mat, x, y, z, parent = pad, seg = 14) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, h, seg), mat);
+  m.position.set(x, y, z); parent.add(m); return m;
+}
+function sphere(r, mat, x, y, z, parent = pad, seg = 20) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r, seg, Math.max(8, seg >> 1)), mat);
+  m.position.set(x, y, z); parent.add(m); return m;
+}
+function tube(p0, p1, r, mat, parent = pad, seg = 8) {
+  const a = new THREE.Vector3(...p0), b = new THREE.Vector3(...p1);
+  const d = b.clone().sub(a), L = d.length();
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, L, seg), mat);
+  m.position.copy(a).add(b).multiplyScalar(0.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
+  parent.add(m); return m;
+}
+function railing(x, z, w, d, y, parent = pad, h = 1.15) {
+  for (const [px, pz] of [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, -1], [0, 1], [-1, 0], [1, 0]]) {
+    box(0.075, h, 0.075, steelDark, x + px * w / 2, y + h / 2, z + pz * d / 2, parent);
+  }
+  box(w, 0.06, 0.06, steelDark, x, y + h, z - d / 2, parent);
+  box(w, 0.06, 0.06, steelDark, x, y + h, z + d / 2, parent);
+  box(0.06, 0.06, d, steelDark, x - w / 2, y + h, z, parent);
+  box(0.06, 0.06, d, steelDark, x + w / 2, y + h, z, parent);
+  box(w, 0.04, 0.04, steelDark, x, y + h * 0.55, z - d / 2, parent);
+  box(w, 0.04, 0.04, steelDark, x, y + h * 0.55, z + d / 2, parent);
+}
+function stairs(x, z0, y0, y1, width, steps, parent = pad) {
+  const rise = (y1 - y0) / steps, run = 0.9;
+  for (let i = 0; i < steps; i++) {
+    box(width, 0.18, run, concrete, x, y0 + rise * (i + 1), z0 + run * (i + 0.5), parent);
+    if (i % 3 === 0) {
+      box(0.07, 1.0, 0.07, steelDark, x - width / 2, y0 + rise * (i + 1) + 0.5, z0 + run * (i + 0.5), parent);
+      box(0.07, 1.0, 0.07, steelDark, x + width / 2, y0 + rise * (i + 1) + 0.5, z0 + run * (i + 0.5), parent);
+    }
+  }
+}
+
+/* --- apron, road and markings ---------------------------------------- *
+ * Site 1/5 sits on a big concrete apron above the steppe; the rocket deck
+ * is a raised flame-trench block in the middle. */
+box(150, 0.30, 120, concrete, 0, -BLOCK_H + 0.15, 0);       // main apron, top -15.7
+box(18, 0.12, 125, asphalt, -11, -BLOCK_H + 0.36, 43);      // access road
+for (let i = 0; i < 12; i++) {
+  box(0.32, 0.02, 5.5, padWhite, -11, -BLOCK_H + 0.43, 6 + i * 9.5);  // centre line
+}
+/* expansion joints in the apron */
+for (let x = -70; x <= 70; x += 12) box(0.10, 0.02, 112, steelDark, x, -BLOCK_H + 0.305, 0);
+for (let z = -54; z <= 54; z += 12) box(136, 0.02, 0.10, steelDark, 0, -BLOCK_H + 0.305, z);
+
+/* pad markings: a stencilled 1/5 and the pad name on the apron */
+(function padNumber() {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 256;
+  const g = c.getContext('2d');
+  g.clearRect(0, 0, 512, 256);
+  g.fillStyle = 'rgba(235,230,218,0.82)';
+  g.font = 'bold 150px "DejaVu Sans Mono", monospace';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('1/5', 256, 105);
+  g.font = 'bold 30px "DejaVu Sans Mono", monospace';
+  g.fillStyle = 'rgba(190,48,38,0.9)';
+  g.fillText("GAGARIN'S START", 256, 205);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(26, 13),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(8, -BLOCK_H + 0.33, 34);
+  pad.add(m);
+})();
+
+/* --- the flame-trench block ------------------------------------------- *
+ * Deck top is y = 0, where the rocket base sits.  The trench mouth at the
+ * front, the sloped deflector and the soot on the deck are what make the
+ * pad read as a launch complex rather than a concrete box. */
 box(46, DECK_H, 38, concrete, 0, -DECK_H / 2, 0);                    // launch deck
 box(TR_W, BOD_H, TR_D, SHADOW, 0, BZ, -2);                           // trench void
 box(12, BOD_H, 38, concrete, -18, BZ, 0);                            // side walls
@@ -673,75 +779,246 @@ box(12, BOD_H, 38, concrete,  18, BZ, 0);
 box(48, BOD_H, 11, concrete, 0, BZ, -15);                            // back wall
 box(12, BOD_H, 10, concrete, -16, BZ, 14);                           // front piers
 box(12, BOD_H, 10, concrete,  16, BZ, 14);
-box(TR_W + 4, 3, 10, concrete, 0, -DECK_H - 1.5, 14);                // lintel over it
+box(TR_W + 4, 3, 10, concrete, 0, -DECK_H - 1.5, 14);                // lintel over the mouth
+box(TR_W - 2, 10.5, 0.6, SHADOW, 0, -9.5, 15.2);                     // dark trench mouth
+box(TR_W + 2, 0.8, 1.2, steelDark, 0, -4.2, 15.6);                   // steel edge beam
+const deflector = box(18, 1.4, 12, concrete, 0, -14.3, 6.0);         // sloped flame deflector
+deflector.rotation.x = -0.55;
+/* black scorching around the exhaust opening */
+(function soot() {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const rg = g.createRadialGradient(64, 64, 4, 64, 64, 64);
+  rg.addColorStop(0, 'rgba(8,7,6,0.85)'); rg.addColorStop(0.55, 'rgba(20,17,14,0.45)');
+  rg.addColorStop(1, 'rgba(30,26,20,0)');
+  g.fillStyle = rg; g.fillRect(0, 0, 128, 128);
+  const tex = new THREE.CanvasTexture(c);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(34, 30),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2; m.position.set(0, 0.012, 1.5); pad.add(m);
+})();
 /* sloping deflector cheeks funnelling the exhaust out of the trench */
 for (const sgn of [-1, 1]) {
   const cheek = box(1.8, 9, 13, concrete, sgn * (TR_W / 2 - 0.9), -DECK_H - 4.5, 3);
   cheek.rotation.z = sgn * 0.3;
 }
+/* low blast wall behind the pad */
+box(86, 5, 4, concrete, 0, -13.5, -27);
 
-/* service tower at x = +17, four legs to 56 m */
-const TX = 19, TZ = 0, TW = 8.2, TH = 36;   // ~56 m, just under the 60 m vehicle
+/* --- launch table / hold-down ring ------------------------------------ */
+const ring = new THREE.Mesh(new THREE.TorusGeometry(5.0, 0.45, 8, 32), steel);
+ring.rotation.x = Math.PI / 2; ring.position.set(0, 0.45, 0); pad.add(ring);
+for (let i = 0; i < 4; i++) {
+  const a = Math.PI / 4 + i * Math.PI / 2;
+  box(1.5, 1.6, 1.5, steelDark, 4.1 * Math.cos(a), 0.8, 4.1 * Math.sin(a));
+  box(0.35, 2.4, 0.35, steel, 4.1 * Math.cos(a), 1.9, 4.1 * Math.sin(a));
+}
+
+/* deck-edge hazard stripes and concrete formwork joints */
+(function deckDetails() {
+  const hc = document.createElement('canvas'); hc.width = hc.height = 64;
+  const hg = hc.getContext('2d');
+  hg.fillStyle = '#c9a227'; hg.fillRect(0, 0, 64, 64);
+  hg.strokeStyle = '#1b1712'; hg.lineWidth = 18;
+  for (let i = -64; i < 128; i += 36) { hg.beginPath(); hg.moveTo(i, 0); hg.lineTo(i + 64, 64); hg.stroke(); }
+  const ht = new THREE.CanvasTexture(hc);
+  ht.wrapS = ht.wrapT = THREE.RepeatWrapping; ht.colorSpace = THREE.SRGBColorSpace;
+  const hm = new THREE.MeshStandardMaterial({ map: ht, roughness: 0.82 });
+  const strip = (w, x, z, spin = 0) => {
+    const t = ht.clone(); t.needsUpdate = true; t.repeat.set(w / 2.4, 1);
+    const mat = hm.clone(); mat.map = t;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, 1.15), mat);
+    m.rotation.set(-Math.PI / 2, 0, spin);
+    m.position.set(x, 0.035, z); pad.add(m);
+  };
+  strip(45.5, 0, 18.35); strip(45.5, 0, -18.35);
+  strip(37.5, 22.3, 0, Math.PI / 2); strip(37.5, -22.3, 0, Math.PI / 2);
+  // formwork joints on the block faces
+  for (let x = -22; x <= 22; x += 5.5) box(0.08, BOD_H, 0.07, steelDark, x, BZ, 19.02);
+  for (const z of [-4, -9, -14]) box(46, 0.07, 0.07, steelDark, 0, z, 19.02);
+  for (const z of [-16, -8, 0, 8, 16]) {
+    box(0.07, BOD_H, 0.08, steelDark, -24.02, BZ, z);
+    box(0.07, BOD_H, 0.08, steelDark, 24.02, BZ, z);
+  }
+  // cable trays / pipes along the block
+  box(0.35, 0.35, 28, steelDark, -24.4, -3.5, 0);
+  box(0.22, 0.22, 28, steel, -24.4, -5.0, 0);
+})();
+
+/* --- service tower, platforms, stairs and crane ----------------------- */
+const TX = 20, TZ = 0, TW = 9.0, TH = 46;
 for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
   lattice(new THREE.Vector3(TX + sx * TW / 2, 0, TZ + sz * TW / 2),
-          new THREE.Vector3(TX + sx * TW / 2, TH, TZ + sz * TW / 2), 0.7, steel, 18);
+          new THREE.Vector3(TX + sx * TW / 2, TH, TZ + sz * TW / 2), 0.7, steel, 22);
 }
-/* horizontal ties every 8 m */
 for (let y = 7; y < TH; y += 7) {
   lattice(new THREE.Vector3(TX - TW / 2, y, TZ - TW / 2), new THREE.Vector3(TX + TW / 2, y, TZ - TW / 2), 0.6, steelDark, 4);
   lattice(new THREE.Vector3(TX - TW / 2, y, TZ + TW / 2), new THREE.Vector3(TX + TW / 2, y, TZ + TW / 2), 0.4, steelDark, 4);
   lattice(new THREE.Vector3(TX - TW / 2, y, TZ - TW / 2), new THREE.Vector3(TX - TW / 2, y, TZ + TW / 2), 0.6, steelDark, 4);
   lattice(new THREE.Vector3(TX + TW / 2, y, TZ - TW / 2), new THREE.Vector3(TX + TW / 2, y, TZ + TW / 2), 0.6, steelDark, 4);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    box(1.5, 0.8, 1.5, steelDark, TX + sx * TW / 2, y, TZ + sz * TW / 2);
+  }
 }
-/* --- hold-down support arms ------------------------------------------- *
- * Four lattice buttresses hinged on the deck clamp the first stage high up
- * on its flanks. They stay hard against the vehicle through the whole
- * ignition sequence, then withdraw OUTWARD in the instant of lift-off:
- * the clamp end swings away from the rocket and comes to rest outboard
- * and above the deck, well clear of both the vehicle and the ground.
- * -------------------------------------------------------------------- */
+/* platforms with railings and a floor at each working level */
+for (const y of [8, 16, 24, 32, 40, 46]) {
+  box(TW + 4, 0.34, TW + 4, steelDark, TX, y, TZ);
+  railing(TX, TZ, TW + 4, TW + 4, y + 0.17);
+}
+/* straight staircase up the front face of the tower */
+/* crane cab and jib at the top */
+box(5.0, 3.2, 4.2, steelDark, TX - 1.5, TH + 2.4, TZ);
+box(3.2, 1.4, 2.4, glassDark, TX - 3.0, TH + 2.8, TZ + 2.2);
+box(18, 0.7, 0.9, steel, TX - 10, TH + 4.4, TZ);
+tube([TX - 1.0, TH + 4.4, TZ], [TX - 8.5, TH + 0.2, TZ], 0.06, steelDark);
+box(0.5, 1.2, 0.5, steelDark, TX - 8.5, TH + 0.8, TZ);
+/* access ladder on the tower's outer face */
+for (const z of [TZ + TW / 2 + 0.18, TZ + TW / 2 + 0.66]) {
+  box(0.06, 8.0, 0.06, steelDark, TX, 4.0, z);
+}
+for (let y = 0.35; y < 8.0; y += 0.55) {
+  box(0.05, 0.05, 0.55, steelDark, TX, y, TZ + TW / 2 + 0.42);
+}
+/* red/white bands on the legs */
+for (const y of [10, 20, 30, 40]) {
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    box(0.9, 0.55, 0.9, padWhite, TX + sx * TW / 2, y, TZ + sz * TW / 2);
+  }
+}
+/* cable mast alongside the tower, with tie cables to the top */
+lattice(new THREE.Vector3(TX + TW / 2 + 3.0, 0, TZ - 3),
+        new THREE.Vector3(TX + TW / 2 + 3.0, TH + 8, TZ - 3), 0.7, steelDark, 20);
+box(2.2, 0.6, 2.2, steelDark, TX + TW / 2 + 3.0, TH + 8, TZ - 3);
+for (const y of [16, 28, 40]) {
+  tube([TX + TW / 2, y, TZ], [TX + TW / 2 + 3.0, y + 3, TZ - 3], 0.045, steelDark);
+}
+
+/* --- hold-down arms with hydraulic rams and counterweights ------------ */
 const holdArms = [];
 for (const [ax, az] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
   const HX = 13.2, HZ = 13.2;                   // hinge on the deck
   const arm = new THREE.Group();
   arm.position.set(HX * ax, 0, HZ * az);
   const aim = Math.atan2(-HX * ax, -HZ * az);        // local +Z faces centre
-  arm.rotation.order = 'YXZ';   // yaw first, THEN swing about the arm's own
-  arm.rotation.y = aim;         // hinge axis - with the default XYZ order
-                                // rotation.x would pitch about the WORLD X
-                                // axis and the tips would sweep sideways,
-                                // breaking the X the four arms should form
+  arm.rotation.order = 'YXZ';
+  arm.rotation.y = aim;
   pad.add(arm);
-  /* reach the core wall 12 units up: the hinges sit on the diagonals
-     between the strap-ons (as on the real R-7 table) and the core narrows
-     with height, so the arms must reach 15.9 inboard to make contact */
   lattice(new THREE.Vector3(0, 0.4, 0), new THREE.Vector3(0, 12, 15.9), 1.6, steel, 4, arm);
-  box(2.6, 2.0, 1.8, steelDark, 0, 12, 15.9, arm);   // the clamp pad
+  box(2.6, 2.0, 1.8, steelDark, 0, 12, 15.9, arm);   // clamp pad
+  tube([0, 0.5, 2.0], [0, 8.0, 12.0], 0.28, padWhite, arm, 10);  // hydraulic ram
+  box(4.0, 2.2, 2.6, steelDark, 0, -1.0, -4.0, arm);             // counterweight
   holdArms.push({ g: arm, aim });
 }
 
-/* --- service-tower swing arms: they pull back before ignition ------------ */
+/* --- service-tower swing arms: they pull back before ignition -------- */
 const swingArms = [];
-for (const y of [20, 31]) {
+for (const y of [12, 20, 31, 40]) {
   const sw = new THREE.Group();
   sw.position.set(TX - TW / 2, y, 0);
   pad.add(sw);
   lattice(new THREE.Vector3(0, 0, 0), new THREE.Vector3(-11.5, 0, 0), 1.1, steel, 3, sw);
-  box(2.4, 1.6, 3.2, steelDark, -10.2, 0, 0, sw);
+  box(2.4, 1.6, 3.6, steelDark, -10.2, 0, 0, sw);
+  box(0.18, 0.18, 3.0, steelDark, -10.2, 0.9, 0, sw);            // umbilical cable
+  tube([-10.2, 0, 0], [-15.4, 0, 0], 0.06, steelDark, sw);       // cable to vehicle
+  for (const z of [-1.6, 1.6]) box(2.0, 0.08, 0.08, steelDark, -10.2, 1.05, z, sw);
   swingArms.push(sw);
 }
 /* umbilical mast / torch */
-lattice(new THREE.Vector3(TX + TW / 2 + 1.6, 0, 0), new THREE.Vector3(TX + TW / 2 + 1.6, 15, 0), 1.0, steelDark, 4);
-/* floodlight masts */
-for (const [fx, fz] of [[-44, -38], [-46, 40], [34, 44], [-6, 52]]) {
-  lattice(new THREE.Vector3(fx, 0, fz), new THREE.Vector3(fx, 22, fz), 0.7, steelDark, 5);
-  box(3.2, 1.2, 1.0, new THREE.MeshStandardMaterial({ color: 0xfff3d0, emissive: 0xffe9b0, emissiveIntensity: 1.6, roughness: .4 }), fx, 22.6, fz);
+lattice(new THREE.Vector3(TX + TW / 2 + 1.6, 0, 0), new THREE.Vector3(TX + TW / 2 + 1.6, 18, 0), 1.0, steelDark, 4);
+
+/* --- propellant storage, water tower, bunker and transporter ---------- */
+for (const [x, z] of [[-58, -42], [-46, 46]]) {
+  sphere(4.0, padWhite, x, -11.5, z);
+  for (const [lx, lz] of [[-2.2, -2.2], [2.2, -2.2], [-2.2, 2.2], [2.2, 2.2]]) {
+    cyl(0.35, 0.45, 4.6, steelDark, x + lx, -13.9, z + lz);
+  }
+  box(8.0, 0.4, 8.0, concrete, x, -15.6, z);
+  tube([x, -12.0, z], [x + 15, -12.0, z], 0.25, steelDark);
 }
-/* low perimeter walls */
-for (const [ax, az, w, d] of [[0, -46, 96, 1.2], [0, 46, 96, 1.2], [-48, 0, 1.2, 92], [48, 0, 1.2, 92]]) {
-  box(w, 3.2, d, concrete, ax, 1.6, az);
+cyl(2.6, 2.6, 12, padWhite, -62, -13.2, 4);
+for (const x of [-66, -58]) { box(1.6, 1.5, 7, concrete, x, -15.1, 4); }
+/* water tower */
+for (const [lx, lz] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]) {
+  cyl(0.35, 0.35, 14, steelDark, -72 + lx, -9, -48 + lz);
+}
+cyl(4.2, 4.2, 5.5, padWhite, -72, 1.5, -48);
+cyl(4.0, 2.6, 1.2, steel, -72, 4.85, -48);
+/* control bunker */
+box(14, 6.5, 11, concrete, -55, -12.7, 22);
+box(15, 0.7, 12, concrete, -55, -9.2, 22);
+box(2.8, 2.2, 0.4, glassDark, -55, -11.4, 27.6);
+cyl(0.2, 0.2, 7, steelDark, -49, -6.5, 25);
+/* rail transporter on the right, clear of the plume */
+for (const x of [31, 35]) {
+  box(0.35, 0.25, 96, steelDark, x, -15.55, 0);
+  for (let z = -46; z <= 46; z += 4) box(2.0, 0.12, 0.4, steelDark, 33, -15.8, z);
+}
+box(6.0, 1.2, 20, steelDark, 33, -14.9, -18);
+for (const z of [-26, -22, -14, -10]) for (const x of [30.5, 35.5]) cyl(0.9, 0.9, 0.5, steelDark, x, -15.2, z, pad, 12);
+lattice(new THREE.Vector3(33, -13.8, -28), new THREE.Vector3(33, -13.8, 4), 3.2, steel, 12);
+box(3.0, 0.8, 4.0, steelDark, 33, -11.8, -28);
+box(2.4, 2.8, 2.0, steelDark, 33, -12.7, 4);
+/* low perimeter fence */
+for (let z = -52; z <= 52; z += 13) {
+  for (const x of [-58, 58]) {
+    box(0.12, 2.2, 0.12, steelDark, x, -14.9, z);
+  }
+}
+for (let x = -58; x <= 58; x += 13) {
+  for (const z of [-52, 52]) box(0.12, 2.2, 0.12, steelDark, x, -14.9, z);
+}
+for (const [x, z, w, d] of [[0, -52, 116, 0.06], [0, 52, 116, 0.06], [-58, 0, 0.06, 104], [58, 0, 0.06, 104]]) {
+  box(w, 0.05, d, steelDark, x, -13.9, z);
+  box(w, 0.05, d, steelDark, x, -14.5, z);
 }
 
+/* --- floodlights, flag and distant buildings ------------------------- */
+for (const [fx, fz] of [[-44, -38], [-46, 40], [34, 44], [-6, 52], [-60, 0], [60, 0], [0, -58], [0, 58]]) {
+  lattice(new THREE.Vector3(fx, -16, fz), new THREE.Vector3(fx, 22, fz), 0.7, steelDark, 6);
+  box(8.0, 0.35, 0.8, steelDark, fx, 22.2, fz);
+  for (let i = -1; i <= 1; i++) box(1.6, 1.0, 1.2, lamp, fx + i * 2.6, 22.9, fz);
+}
+/* Soviet flag on a mast: gold hammer-and-sickle and star on red */
+const flagPole = cyl(0.16, 0.22, 22, steelDark, -30, -5, -12);
+(function flag() {
+  const c = document.createElement('canvas'); c.width = 300; c.height = 200;
+  const g = c.getContext('2d');
+  g.fillStyle = '#b3261e'; g.fillRect(0, 0, 300, 200);
+  const gold = '#f2c94c';
+  const drawStar = (cx, cy, r, fill) => {
+    g.fillStyle = fill; g.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + i * Math.PI / 5;
+      const rr = i % 2 ? r * 0.42 : r;
+      const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr;
+      if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+    }
+    g.closePath(); g.fill();
+  };
+  drawStar(64, 38, 20, gold);
+  const emblem = new Image();
+  emblem.onload = () => {
+    const e = document.createElement('canvas'); e.width = e.height = 100;
+    const eg = e.getContext('2d');
+    eg.drawImage(emblem, 0, 0, 100, 100);
+    eg.globalCompositeOperation = 'source-in';
+    eg.fillStyle = gold; eg.fillRect(0, 0, 100, 100);
+    g.globalCompositeOperation = 'source-over';
+    g.drawImage(e, 24, 52, 80, 80);
+    tex.needsUpdate = true;
+  };
+  emblem.src = './tools/emblem_source.png';
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(6.2, 4.1),
+    new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: 0.85 }));
+  m.position.set(-26.8, 14.4, -12); m.rotation.y = 0.18; pad.add(m);
+})();
+/* a few steppe structures so the horizon is not empty */
+for (const [x, z, w, h, d] of [[-82, -48, 16, 6, 10], [-92, 28, 12, 4, 8], [68, -52, 20, 7, 12], [78, 34, 10, 4, 8]]) {
+  box(w, h, d, concrete, x, -BLOCK_H + h / 2, z);
+  box(w + 1, 0.5, d + 1, concrete, x, -BLOCK_H + h, z);
+}
+/* low perimeter walls replaced by the fence above */
 /* ==================================================================== *
  *  Earth
  * ==================================================================== */
@@ -875,32 +1152,33 @@ earthGroup.add(atmoMesh);
 const rocket = new THREE.Group();          // gltf.scene gets added here
 orbitPivot.add(rocket);
 const parts = {};
-let capsule = null;
+let capsule = null, saModule = null, paModule = null;
+const craftMeshes = new Set();            // SA/PA and all their sub-meshes
+const paMeshes = new Set();               // instrument-module sub-meshes
 
 new GLTFLoader().load(GLB, (gltf) => {
   rocket.add(gltf.scene);
   gltf.scene.traverse((o) => {
     if (!o.isMesh) return;
     o.castShadow = false; o.receiveShadow = false;
-    /* the capsule ships as a fairly shiny metal; tone it down so the grey
-       dome reads in orbit instead of going black at grazing angles */
-    if (o.name === 'Vostok_Capsule' && o.material) {
-      o.material.metalness = 0.3; o.material.roughness = 0.5;
+    /* the descent module is bare aluminium; tone the metal down so it does
+       not go black at grazing angles in the orbital view */
+    if ((o.name === 'Vostok_SA' || o.name === 'Vostok_PA') && o.material) {
+      o.material.metalness = 0.5; o.material.roughness = 0.42;
     }
     parts[o.name] = o;
   });
-  /* the capsule is a multi-primitive mesh, so the loader wraps it in a
-     group named after the node - fetch it by node name rather than from
-     the mesh-only parts map, and pull its child meshes back OUT of parts:
-     the visibility logic below keys on part names and would hide them */
+  /* The spacecraft is a parent empty with an SA and PA under it, so that
+     the instrument module can be jettisoned at 10:35 while the sphere
+     flies on.  The app moves the parent; the parts map keeps the child
+     meshes for the camera/visibility logic. */
   capsule = gltf.scene.getObjectByName('Vostok_Capsule');
-  if (capsule) {
-    capsule.traverse((o) => { if (o.isMesh && parts[o.name]) delete parts[o.name]; });
-  }
+  saModule = gltf.scene.getObjectByName('Vostok_SA');
+  paModule = gltf.scene.getObjectByName('Vostok_PA');
+  if (capsule) capsule.traverse((o) => { if (o.isMesh) craftMeshes.add(o); });
+  if (paModule) paModule.traverse((o) => { if (o.isMesh) paMeshes.add(o); });
   /* Every jettisoned part drifts along its OWN radial direction, measured
-     from its baked geometry. (The old code guessed one shared angle per
-     index and yawed each booster by it, which stacked two strap-ons onto
-     the same azimuth and left two gaps in the ring.) */
+     from its baked geometry. */
   for (const name in SEP) {
     const o = parts[name];
     if (!o || SEP[name].kind !== 'booster' || !o.geometry) continue;
@@ -919,18 +1197,16 @@ for (let i = 1; i <= 4; i++) {
   SEP['Booster_' + i] = { t0: T_BOOST_SEP, kind: 'booster', ang: 0 };
   SEP['Fin_' + i] = { t0: T_BOOST_SEP, kind: 'booster', ang: 0 };
 }
-/* The shroud is jettisoned at T+151 s, well BEFORE the core stage lets go at
-   T+300 s - previously these were bundled together and the shroud came off
-   next to orbital insertion, which is nothing like how the flight ran. */
-SEP['Payload_Fairing'] = { t0: T_FAIR_SEP, kind: 'upper' };
-/* At T+300 s the core - the rest of stage one after the strap-ons went - shuts
-   down and is left behind, taking the interstage truss with it. Neither
-   Core_Stage1 nor the truss had an entry here, so both stayed attached for
-   the whole flight. */
+/* The shroud is two petals (left/right), jettisoned together at T+154 s. */
+SEP['Payload_Fairing_L'] = { t0: T_FAIR_SEP, kind: 'fairingL' };
+SEP['Payload_Fairing_R'] = { t0: T_FAIR_SEP, kind: 'fairingR' };
+/* At T+299 s the whole Block A core shuts down and is left behind, taking
+   the interstage truss with it.  There is no separate "Stage2": the core
+   is one stage. */
 SEP['Core_Stage1'] = { t0: T_CORE_SEP, kind: 'core' };
 SEP['Lattice_Frame'] = { t0: T_CORE_SEP, kind: 'core' };
-/* The Block-E is the last stage: it keeps burning to insertion and only lets
-   the spacecraft go at T+686 s, handled by the inOrbit cutoff. */
+/* Block E is the last stage: it keeps burning to insertion and only lets
+   the spacecraft go at T+688 s, handled by the inOrbit cutoff. */
 
 /* ==================================================================== *
  *  exhaust: flame + smoke
@@ -1097,7 +1373,7 @@ const boosterGeo = flameCone(1.7, BOOSTER_LEN, 32, 14);
 boosterGeo.translate(0, -BOOSTER_LEN / 2, 0);
 const boosterMat = flameMaterial(0, BOOSTER_LEN, 0.5, 1.7 / BOOSTER_LEN);
 const boosterFlames = [];
-for (const [bx, bz] of [[2.45, 0], [0, -2.5], [-2.45, 0], [0, 2.4]]) {
+for (const [bx, bz] of [[2.775, 0], [0, -2.775], [-2.775, 0], [0, 2.775]]) {
   const m = new THREE.Mesh(boosterGeo, boosterMat);
   m.position.set(bx, 0.35, bz);
   /* each jet flares a few degrees outward, the way the strap-on plumes do */
@@ -1118,7 +1394,7 @@ const verMat = flameMaterial(1, VER_LEN, 1.0, 0.55 / VER_LEN);
 const vernierFlames = [];
 for (const ang of [Math.PI / 4, 3 * Math.PI / 4, 5 * Math.PI / 4, 7 * Math.PI / 4]) {
   const m = new THREE.Mesh(verGeo, verMat);
-  m.position.set(Math.cos(ang) * 2.1, 0.5, Math.sin(ang) * 2.1);
+  m.position.set(Math.cos(ang) * 1.26, 0.5, Math.sin(ang) * 1.26);
   const tip = new THREE.Vector3(-Math.sin(ang), 0, Math.cos(ang));
   m.setRotationFromQuaternion(new THREE.Quaternion().setFromAxisAngle(tip, 0.55));
   m.renderOrder = 21;
@@ -1129,13 +1405,13 @@ for (const ang of [Math.PI / 4, 3 * Math.PI / 4, 5 * Math.PI / 4, 7 * Math.PI / 
 /* the Block-E's RD-0109, hot-staged through the open truss at ~T+294 s and
    burning to orbital insertion at T+676 s. The nozzle sits up at the
    Block-E's base, but once the core is gone the visible jet issues from
-   the bottom of the remaining stack (the Stage2 boat-tail at y ~ 20). */
+   the bottom of the remaining stack (the Block E nozzle at y ~ 28.6). */
 const BLE_LEN = 14;
 const bleGeo = flameCone(1.6, BLE_LEN, 32, 14);
 bleGeo.translate(0, -BLE_LEN / 2, 0);
 const bleMat = flameMaterial(1, BLE_LEN, 0.55, 1.6 / BLE_LEN);
 const bleFlame = new THREE.Mesh(bleGeo, bleMat);
-bleFlame.position.set(0, 20.2, 0);
+bleFlame.position.set(0, 28.55, 0);
 bleFlame.renderOrder = 21;
 bleFlame.visible = false;
 exhaust.add(bleFlame);
@@ -1182,7 +1458,7 @@ exhaust.add(glow);
    shroud's jettison charge, and the core letting go. Posed in the vehicle
    frame (a child of exhaust), so they ride the gravity turn. */
 const stageFlashes = [];
-for (const [sy, sc] of [[17, 10], [34, 6], [22, 8]]) {
+for (const [sy, sc] of [[17, 10], [35.5, 7], [28.5, 8]]) {
   const mat = new THREE.SpriteMaterial({
     map: puffTex, transparent: true, depthWrite: false, depthTest: false,
     blending: THREE.AdditiveBlending, color: new THREE.Color(1.0, 0.85, 0.55),
@@ -1271,7 +1547,34 @@ function makeChute(scale) {
   return g;
 }
 const chute = makeChute(1);        // the capsule's main canopy
-const gagChute = makeChute(0.7);   // Gagarin's personal parachute
+const gagChute = makeChute(0.5);   // Gagarin's personal parachute
+
+/* soft contact shadows make the final ground contact readable - without
+   them the capsule and Gagarin can look as if they hover over the steppe
+   even when their geometry is exactly on it */
+const shadowTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const rg = g.createRadialGradient(64, 64, 2, 64, 64, 64);
+  rg.addColorStop(0, 'rgba(0,0,0,0.7)');
+  rg.addColorStop(0.55, 'rgba(0,0,0,0.32)');
+  rg.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = rg; g.fillRect(0, 0, 128, 128);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+})();
+function contactShadow(size) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size),
+    new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false, opacity: 0,
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  m.rotation.x = -Math.PI / 2;
+  m.renderOrder = 2;
+  scene.add(m);
+  return m;
+}
+const capsuleShadow = contactShadow(1);
+const gagShadow = contactShadow(1);
+capsuleShadow.visible = gagShadow.visible = false;
 /* the cosmonaut himself, built with MakeHuman - loaded once, hidden until
    the ejection at ~7 km */
 let cosmonaut = null;
@@ -1366,14 +1669,14 @@ function updatePlume(dt, thr, boThr, bleThr, wide, entry) {
     power = thr;
     emitR = boThr > 0.02 ? 2.3 : 1.1;
   }
-  if (bleThr > 0.02) { power = bleThr; offY = 20.2; emitR = 0.9; jet = 26; }
+  if (bleThr > 0.02) { power = bleThr; offY = 28.55; emitR = 0.9; jet = 26; }
   if (entry.pow > 0.02) {
     power = entry.pow; mode = 1; jet = 2.5; emitR = 1.2 * entry.scale;
   }
   if (power > 0) {
     if (mode === 0) _plumeDir.set(0, -1, 0).applyQuaternion(exhaust.quaternion);
     else _plumeDir.copy(entry.dir);
-    plume.acc += power * (mode === 0 ? 430 : 300) * dt;
+    plume.acc += power * (mode === 0 ? 430 : 170) * dt;
     while (plume.acc >= 1) {
       plume.acc -= 1;
       const i = plume.cursor; plume.cursor = (plume.cursor + 1) % PLUME_N;
@@ -1406,7 +1709,7 @@ function updatePlume(dt, thr, boThr, bleThr, wide, entry) {
       plume.life[i] = mode === 0 ? 0.35 + Math.random() * 0.5 : 0.5 + Math.random() * 0.8;
       plume.seed[i] = Math.random() * 100;
       plume.mode[i] = mode;
-      plume.s0[i] = (mode === 0 ? 1.2 : 1.6 * entry.scale) + Math.random() * 1.4;
+      plume.s0[i] = (mode === 0 ? 1.2 : 0.8 * entry.scale) + Math.random() * 0.8;
       plume.s1[i] = plume.s0[i] * (mode === 0 ? (2.0 + wide * 1.5) : (2.5 + Math.random() * 1.5));
     }
   }
@@ -1462,16 +1765,16 @@ function updatePlume(dt, thr, boThr, bleThr, wide, entry) {
  * ==================================================================== */
 // [t, camOffsetFromRocketBase, targetOffsetFromRocketBase]
 const CAM_OFF = [
-  [0.000, [-50, 9, 84], [0, 9, 0]],
-  [0.055, [-46, 12, 78], [0, 12, 0]],
-  [0.115, [-44, 13, 74], [0, 15, 0]],
-  [0.200, [-46, 14, 78], [0, 17, 0]],
+  [0.000, [-62, 17, 104], [0, 15, 0]],
+  [0.055, [-56, 18, 94], [0, 16, 0]],
+  [0.115, [-53, 17, 86], [0, 17, 0]],
+  [0.200, [-50, 16, 80], [0, 17, 0]],
   [0.320, [-42, 13, 72], [0, 17, 0]],
   [0.420, [-38, 12, 64], [0, 16, 0]],
   [0.510, [-33, 11, 55], [0, 15, 0]],
   [0.560, [-30, 10, 50], [0, 15, 0]],
 ];
-const CAP_LOCAL_Y = 34.35;   // capsule centre in the rocket's own frame (31.65..37.05)
+const CAP_LOCAL_Y = 35.115;  // 3KA centre in the rocket frame (32.84..37.39)
 const camPos = new THREE.Vector3(), camTgt = new THREE.Vector3();
 const _veh = new THREE.Vector3(), _cwp = new THREE.Vector3(), _qa = new THREE.Quaternion();
 const _ax = new THREE.Vector3(), _fw = new THREE.Vector3();
@@ -1484,7 +1787,7 @@ const _sepTip = new THREE.Vector3();   // staging: tangential axis of a jettison
 const _qb = new THREE.Quaternion(), _qc = new THREE.Quaternion();
 const _qAtt = new THREE.Quaternion();
 const _landPos = new THREE.Vector3(), _landNext = new THREE.Vector3();
-const _landAxis = new THREE.Vector3(), _lc = new THREE.Vector3();
+const _landAxis = new THREE.Vector3(), _entryDir = new THREE.Vector3(), _lc = new THREE.Vector3();
 
 /* Camera handover to the orbital chase. Starting at insertion (T_ORBIT)
  * rather than at spacecraft separation: the orbit pose is thousands of
@@ -1517,8 +1820,8 @@ function cameraRig(t, h, RE, a, surfY, vehPos, capWorld, axis) {
        gone the second stage plus Block-E is still ~25 units tall, so a
        15-unit standoff just filled the frame with a blur. */
     const axDir = _ax.set(0, Math.cos(axis), Math.sin(axis)).applyQuaternion(qOrbit);
-    const focus = _fw.copy(vehPos).addScaledVector(axDir, 22);
-    camPos.lerp(_a.set(-34, 17, 52).add(focus), followCap);
+    const focus = _fw.copy(vehPos).addScaledVector(axDir, 33);
+    camPos.lerp(_a.set(-22, 10, 38).add(focus), followCap);
     camTgt.lerp(focus, followCap);
   }
 
@@ -1554,6 +1857,7 @@ function cameraRig(t, h, RE, a, surfY, vehPos, capWorld, axis) {
  * ==================================================================== */
 const seek = document.getElementById('seek');
 const phaseEl = document.getElementById('phase');
+const eventTimeEl = document.getElementById('eventTime');
 const clockEl = document.getElementById('clock');
 const altEl = document.getElementById('alt');
 const velEl = document.getElementById('vel');
@@ -1578,14 +1882,66 @@ const freeBtn = document.getElementById('free');
 const loadEl = document.getElementById('load');
 const camModeEl = document.getElementById('camMode');
 
+/* Collapsible panel.  On a portrait phone the info + camera panel would cover
+   most of the frame, so it starts as a compact clock/phase bar; tapping the
+   chevron opens the full scrollable sheet.  The choice is remembered. */
+const uiPanel = document.getElementById('ui');
+const uiToggle = document.getElementById('uiToggle');
+const miniEl = document.getElementById('mini');
+const UI_KEY = 'vostok.mission.panel';
+let uiStored = null;
+try { uiStored = localStorage.getItem(UI_KEY); } catch (e) { /* private mode */ }
+const uiMq = matchMedia('(max-width: 760px), (orientation: portrait), (max-height: 520px)');
+function setPanelCollapsed(collapsed, save = true) {
+  uiPanel.classList.toggle('collapsed', collapsed);
+  uiToggle.setAttribute('aria-expanded', String(!collapsed));
+  uiToggle.setAttribute('aria-label', collapsed ? 'Expand mission panel' : 'Collapse mission panel');
+  uiToggle.title = collapsed ? 'Expand panel' : 'Collapse panel';
+  uiToggle.textContent = collapsed ? '+' : '\u2212';
+  if (save) {
+    try { localStorage.setItem(UI_KEY, collapsed ? '1' : '0'); } catch (e) { /* ignore */ }
+  }
+}
+setPanelCollapsed(uiStored !== null ? uiStored === '1' : uiMq.matches, false);
+uiToggle.addEventListener('click', () => {
+  setPanelCollapsed(!uiPanel.classList.contains('collapsed'));
+});
+function syncPanelToViewport(e) {
+  try {
+    if (localStorage.getItem(UI_KEY) === null) setPanelCollapsed(e.matches, false);
+  } catch (err) { /* ignore */ }
+}
+if (uiMq.addEventListener) uiMq.addEventListener('change', syncPanelToViewport);
+else if (uiMq.addListener) uiMq.addListener(syncPanelToViewport);
+
+/* Wall-clock helpers: the mission clock is the authoritative timebase, but
+   the published event times are Moscow Time (UTC+3).  Showing both makes the
+   sequence checkable against the sources. */
+const MSK_LAUNCH = 9 * 3600 + 6 * 60 + 59.7;   // 09:06:59.7 MSK
+function hhmmss(secOfDay) {
+  const s = ((secOfDay % 86400) + 86400) % 86400;
+  return String(Math.floor(s / 3600)).padStart(2, '0') + ':' +
+         String(Math.floor((s % 3600) / 60)).padStart(2, '0') + ':' +
+         String(Math.floor(s % 60)).padStart(2, '0');
+}
+const mskAt = (mt) => hhmmss(MSK_LAUNCH + mt);
+const utcAt = (mt) => hhmmss(MSK_LAUNCH + mt - 3 * 3600);
+function tClock(sec) {
+  const sign = sec < 0 ? 'T\u2212' : 'T+';
+  const a = Math.abs(sec);
+  return sign + String(Math.floor(a / 60)).padStart(2, '0') + ':' +
+         String(Math.floor(a % 60)).padStart(2, '0');
+}
+
 (function buildMarks() {
   const box = document.getElementById('marks');
-  for (const [t, name] of PHASES) {
+  for (const [t, name, sec] of PHASES) {
     /* bare tick + tooltip: the early events cluster in the first quarter of
        the timeline, and text labels there overlap into an unreadable jumble */
     const i = document.createElement('i');
     i.style.left = (t * 100) + '%';
-    i.title = name.replace(/\s{2}-\s{2}/, ' - ');
+    i.title = tClock(sec) + '  ·  ' + mskAt(sec) + ' MSK — ' +
+              name.replace(/\s{2}-\s{2}/, ' - ');
     box.appendChild(i);
   }
 })();
@@ -1616,6 +1972,9 @@ addEventListener('keydown', (e) => {
   if (e.code === 'Space') { e.preventDefault(); playBtn.click(); }
   if (e.key === 'r' || e.key === 'R') document.getElementById('restart').click();
   if (e.key === 'c' || e.key === 'C') setCam(!freeCam);
+  if (e.key === 'i' || e.key === 'I') {
+    setPanelCollapsed(!uiPanel.classList.contains('collapsed'));
+  }
 });
 
 addEventListener('resize', () => {
@@ -1640,7 +1999,7 @@ let NOW = 0;                      // shader clock for the exhaust flow
  * would actually be there.
  * -------------------------------------------------------------------- */
 /* The RD-108 core keeps burning after the strap-ons drop, so thrust is only
-   cut at core-stage separation (T+300 s), not at booster separation. */
+   cut at core-stage separation (T+299 s), not at booster separation. */
 function throttleAt(t) {
   return sstep(T_IGNITE, T_IGNITE + 0.02, t) *
          (1 - sstep(T_CORE_SEP - 0.015, T_CORE_SEP + 0.025, t));
@@ -1822,7 +2181,7 @@ function applyTimeline(t, dt) {
   const landBlend = sstep(T_RETRO, T_ENTRY + 0.03, t);
   const attBlend = sstep(T_RETRO - 0.002, T_RETRO + 0.025, t);
   const capScaleNow = lerp(lerp(1, ORBIT_CAP_SCALE, orbBlend), 1,
-                           sstep(T_RETRO, tAtMission(5900), t));
+                           sstep(T_RETRO, T_PA_SEP, t));
   if (landBlend > 0) {
     rocket.scale.setScalar(capScaleNow);
     landPose(t, _landPos);
@@ -1836,8 +2195,11 @@ function applyTimeline(t, dt) {
     /* tail-first for the burn (engine, at the mesh's bottom, faces the
        direction of flight so the exhaust shoots forward), a 180-degree flip
        to sphere-first for entry, then hanging vertical under the canopy */
+    /* The 3KA's heat shield is the face that was mated to the PA, i.e. the
+       -Y end of the vehicle.  Retrofire flies the PA first (-Y forward), and
+       re-entry keeps that same heat-shield-first attitude; there is no
+       180-degree flip.  Only under the main canopy does +Y come upright. */
     _landAxis.copy(fd).negate();
-    _landAxis.lerp(fd, sstep(T_RETRO_END + 0.01, T_ENTRY - 0.02, t)).normalize();
     _landAxis.lerp(UP, sstep(T_CHUTE - 0.004, T_CHUTE + 0.004, t)).normalize();
     _qAtt.setFromUnitVectors(UP, _landAxis);
     _qc.copy(orbitPivot.quaternion).multiply(_qb.setFromAxisAngle(AXIS_X, pitch));
@@ -1847,6 +2209,19 @@ function applyTimeline(t, dt) {
     if (landBlend > 0.5) capWorld.copy(vehPos);
   } else {
     _landAxis.set(0, -1, 0);
+  }
+
+  /* --- instrument module separation at 10:35 -------------------------- *
+   * The TDU-1 burn was cut short by a leaking valve, so the nominal
+   * separation command never came; the PA stayed attached while the
+   * spacecraft tumbled, and finally let go ~10 minutes later over the
+   * Mediterranean (Gagarin's own report).  Model that late separation:
+   * the cone drifts ahead of the heat shield and tumbles away while the
+   * SA continues alone. */
+  const paSep = sstep(T_PA_SEP, T_PA_SEP + 0.012, t);
+  if (paModule) {
+    paModule.position.set(0, -16 * paSep, 2.5 * paSep);
+    paModule.rotation.set(1.15 * paSep, 0.45 * paSep, 0.55 * paSep);
   }
 
   /* --- staging --- */
@@ -1868,11 +2243,14 @@ function applyTimeline(t, dt) {
     } else if (s.kind === 'core') {
       o.position.set(0, -70 * k, 0);          // falls away behind the vehicle
       o.rotation.set(0.4 * k, 0, -0.22 * k);
+    } else if (s.kind === 'fairingL') {
+      /* the shroud's pyrotechnics split it into two petals; each peels
+         sideways and tumbles, it does not slide forward past the nose */
+      o.position.set(30 * k, 16 * k, 3 * k);
+      o.rotation.set(0.3 * k, 0.15 * k, 1.05 * k);
     } else {
-      /* the shroud's pyrotechnics blow it clear sideways; it peels off and
-         tumbles, it does not slide forward past the capsule's nose */
-      o.position.set(26 * k, 18 * k, 9 * k);
-      o.rotation.set(0.25 * k, 0, 0.8 * k);
+      o.position.set(-30 * k, 16 * k, -3 * k);
+      o.rotation.set(0.3 * k, -0.15 * k, -1.05 * k);
     }
   }
   /* Spacecraft separation at T+688 s: the capsule snaps onto the orbit
@@ -1882,19 +2260,23 @@ function applyTimeline(t, dt) {
      instantly at separation.) */
   const stageBack = 6.0 * sstep(T_SEP, T_SEP + 0.15, t);
   const stageTip = 0.22 * sstep(T_SEP, T_SEP + 0.15, t);
-  for (const name of ['Stage2', 'BlockE_Stage3']) {
+  for (const name of ['BlockE_Stage3']) {
     const o = parts[name];
     if (!o) continue;
     o.position.y = capLocal - stageBack;   // rides the capsule's snap shift,
     o.rotation.x = stageTip;               // then falls behind and tumbles
   }
-  const stageNames = ['Stage2', 'BlockE_Stage3'];
+  const stageNames = ['BlockE_Stage3'];
   const inOrbit = t >= T_SEP;
   for (const name in parts) {
-    if (name === 'Vostok_Capsule') { parts[name].visible = true; continue; }
-    if (inOrbit) { parts[name].visible = stageNames.indexOf(name) >= 0 && t < T_SEP + 0.15; continue; }
+    const o = parts[name];
+    /* the SA and PA are the spacecraft: they must survive every staging
+       purge.  The PA itself is hidden once it has tumbled clear. */
+    if (paMeshes.has(o)) { o.visible = t < T_PA_SEP + 0.040; continue; }
+    if (craftMeshes.has(o)) { o.visible = true; continue; }
+    if (inOrbit) { o.visible = stageNames.indexOf(name) >= 0 && t < T_SEP + 0.15; continue; }
     const s = SEP[name];
-    parts[name].visible = !(s && t > s.t0 + 0.075);
+    o.visible = !(s && t > s.t0 + 0.075);
   }
 
   /* --- exhaust --- */
@@ -1955,9 +2337,9 @@ function applyTimeline(t, dt) {
      over the snap window while the whole rocket group is being scaled up for
      the orbital view, and the exhaust group this sprite rides in is NOT
      scaled - so track the rendered interface explicitly: capsule bottom in
-     the rocket frame (baked base 31.9 + the snap shift) x the rocket scale. */
+     the rocket frame (baked base 32.84 + the snap shift) x the rocket scale. */
   const flare = sstep(T_SEP - 0.002, T_SEP + 0.004, t) * (1 - sstep(T_SEP + 0.02, T_SEP + 0.065, t));
-  const ifY = (31.65 + capLocal) * lerp(1, ORBIT_CAP_SCALE, orbBlend);
+  const ifY = (32.84 + capLocal) * lerp(1, ORBIT_CAP_SCALE, orbBlend);
   sepFlash.visible = flare > 0.01;
   sepFlash.position.set(0, ifY, 0);
   sepLight.position.set(0, ifY, 0);
@@ -1971,8 +2353,10 @@ function applyTimeline(t, dt) {
   /* --- landing effects --- */
   /* the TDU-1 burn: a short, tight jet firing forward while the capsule
      flies tail-first */
-  const retroThr = sstep(T_RETRO, T_RETRO + 0.006, t) *
-                   (1 - sstep(T_RETRO_END - 0.004, T_RETRO_END + 0.003, t));
+  /* The 39 s burn is only ~0.2 s of the 95 s show; widen the envelope just
+     enough for the flame to register, without moving the event itself. */
+  const retroThr = sstep(T_RETRO, T_RETRO + 0.003, t) *
+                   (1 - sstep(T_RETRO_END + 0.001, T_RETRO_END + 0.005, t));
   retroFlame.visible = retroThr > 0.02;
   if (retroFlame.visible) {
     retroFlame.position.copy(vehPos).addScaledVector(_landAxis, -2.3 * capScaleNow);
@@ -1988,9 +2372,9 @@ function applyTimeline(t, dt) {
   plasmaGlow.visible = plasma > 0.01;
   if (plasmaGlow.visible) {
     const flick = 0.75 + 0.25 * Math.sin(NOW * 31) * Math.sin(NOW * 17.3);
-    plasmaGlow.position.copy(vehPos).addScaledVector(_landAxis, 2.0 * capScaleNow);
-    plasmaGlow.scale.setScalar((1.8 + 1.2 * flick) * capScaleNow);
-    plasmaMat.opacity = plasma * flick * 0.55;
+    plasmaGlow.position.copy(vehPos).addScaledVector(_landAxis, -2.0 * capScaleNow);
+    plasmaGlow.scale.setScalar((1.15 + 0.75 * flick) * capScaleNow);
+    plasmaMat.opacity = plasma * flick * 0.42;
     plasmaLight.position.copy(plasmaGlow.position);
     plasmaLight.intensity = plasma * flick * 40 * capScaleNow;
   } else {
@@ -1999,15 +2383,15 @@ function applyTimeline(t, dt) {
   /* the main canopy: reefed open over a moment, swaying gently, collapsing
      beside the capsule after touchdown and fading as the mission ends */
   const chuteK = sstep(T_CHUTE, T_CHUTE + 0.008, t);
-  const chuteGone = sstep(tAtMission(6500), tAtMission(6530), t);
+  const chuteGone = sstep(T_TOUCH, T_TOUCH + 0.010, t);
   chute.visible = chuteK > 0.005 && chuteGone < 1;
   if (chute.visible) {
     const swayA = 1 - sstep(T_TOUCH - 0.006, T_TOUCH, t);
-    const collapse = sstep(T_TOUCH, tAtMission(6520), t);
+    const collapse = sstep(T_TOUCH, T_TOUCH + 0.010, t);
     const sway = Math.sin(NOW * 0.9) * 0.10 * swayA;
     chute.position.set(
       vehPos.x + sway * 8 + collapse * 20,
-      lerp(vehPos.y + 10, -BLOCK_H + 0.5, collapse),
+      lerp(vehPos.y + 11.8, -BLOCK_H + 0.5, collapse),
       vehPos.z + sway * 4 + collapse * 12);
     chute.scale.set(lerp(0.25, 1, chuteK),
                     lerp(0.5, 1, chuteK) * (1 - collapse * 0.65),
@@ -2021,8 +2405,8 @@ function applyTimeline(t, dt) {
   /* --- Gagarin's own descent: he ejected at ~7 km, free-fell while the
      capsule's canopy opened, then came down beside it under his personal
      parachute --- */
-  const gagK = sstep(T_CHUTE, T_CHUTE + 0.006, t);
-  const gagTouchK = sstep(T_GAG_TOUCH, tAtMission(6555), t);
+  const gagK = sstep(T_EJECT, T_EJECT + 0.006, t);
+  const gagTouchK = sstep(T_GAG_TOUCH, T_GAG_TOUCH + 0.006, t);
   if (cosmonaut) {
     cosmonaut.visible = gagK > 0.01;
     if (cosmonaut.visible) {
@@ -2036,8 +2420,8 @@ function applyTimeline(t, dt) {
     }
   }
   /* his personal parachute streams a little after the capsule's opens */
-  const gagChuteK = sstep(tAtMission(6320), tAtMission(6328), t);
-  const gagChuteGone = sstep(tAtMission(6550), tAtMission(6590), t);
+  const gagChuteK = sstep(T_GAG_CHUTE, T_GAG_CHUTE + 0.0015, t);
+  const gagChuteGone = sstep(T_GAG_TOUCH, T_GAG_TOUCH + 0.008, t);
   gagChute.visible = gagChuteK > 0.005 && gagChuteGone < 1 && gagK > 0.01;
   if (gagChute.visible && cosmonaut) {
     const swayA = 1 - gagTouchK;
@@ -2045,7 +2429,7 @@ function applyTimeline(t, dt) {
     const sway = Math.sin(NOW * 0.85 + 2) * 0.10 * swayA;
     gagChute.position.set(
       cosmonaut.position.x + sway * 6 + collapse * 7,
-      lerp(cosmonaut.position.y + 7, -BLOCK_H + 0.4, collapse),
+      lerp(cosmonaut.position.y + 6.05, -BLOCK_H + 0.4, collapse),
       cosmonaut.position.z + sway * 3 + collapse * 4);
     gagChute.scale.set(lerp(0.25, 1, gagChuteK),
                        lerp(0.5, 1, gagChuteK) * (1 - collapse * 0.65),
@@ -2054,6 +2438,23 @@ function applyTimeline(t, dt) {
     const op = 1 - gagChuteGone;
     gagChute.userData.dome.material.opacity = op;
     gagChute.userData.lines.material.opacity = op;
+  }
+  /* contact shadows: fade in as the capsule and Gagarin approach the
+     steppe, then sit under them at touchdown */
+  const capH = Math.max(0, landAlt(t));
+  const gagH = Math.max(0, cosmonaut ? cosmonaut.position.y + BLOCK_H : 0);
+  capsuleShadow.visible = t > T_RETRO;
+  if (capsuleShadow.visible) {
+    capsuleShadow.position.set(vehPos.x, -BLOCK_H + 0.09, vehPos.z);
+    capsuleShadow.scale.setScalar(5.2);
+    capsuleShadow.material.opacity = clamp(1 - capH / 14) * 0.52 *
+      sstep(T_RETRO, T_RETRO + 0.01, t);
+  }
+  gagShadow.visible = !!(cosmonaut && cosmonaut.visible);
+  if (gagShadow.visible) {
+    gagShadow.position.set(cosmonaut.position.x, -BLOCK_H + 0.09, cosmonaut.position.z);
+    gagShadow.scale.setScalar(1.5);
+    gagShadow.material.opacity = clamp(1 - gagH / 10) * 0.48;
   }
   /* touchdown: one burst of steppe dust, reusing the smoke pool */
   if (t < T_TOUCH) dustFired = false;
@@ -2073,8 +2474,10 @@ function applyTimeline(t, dt) {
     }
   }
 
+  /* the plasma trail streams opposite the heat shield's leading face */
+  _entryDir.copy(_landAxis).negate();
   updatePlume(dt, throttle, boThr, bleThr, wide,
-              { pow: plasma, pos: vehPos, dir: _landAxis, scale: capScaleNow });
+              { pow: plasma, pos: vehPos, dir: _entryDir, scale: capScaleNow });
   updateSmoke(t, dt, dark);
 
   /* --- camera --- */
@@ -2088,22 +2491,31 @@ function applyTimeline(t, dt) {
     if (camLand > 0) {
       /* when the canopy is out the camera must sit far back and nearly
          level, or the dome fills the frame */
-      const chuteVis = sstep(T_CHUTE - 0.004, T_CHUTE + 0.01, t) *
-                       (1 - sstep(T_TOUCH, tAtMission(6540), t));
+      const chuteVis = sstep(T_GAG_CHUTE - 0.004, T_GAG_CHUTE + 0.01, t) *
+                       (1 - sstep(T_TOUCH, T_TOUCH + 0.010, t));
+      /* In portrait the horizontal FOV is only ~20 deg, so the default
+         stand-off would leave the capsule/Gagarin pair outside the frame.
+         Pull the landing camera back by the inverse of the aspect ratio. */
+      const aspectFix = Math.max(1, 0.95 / camera.aspect);
       const dist = (10 + 2.0 * capScaleNow) * lerp(1.6, 1.0, sstep(T_RETRO, T_CHUTE, t)) *
-                   lerp(1, 2.4, chuteVis);
+                   lerp(1, 2.4, chuteVis) * aspectFix;
       const ang = 0.8 + sstep(T_RETRO, T_TOUCH, t) * 1.2;   // slow arc around it
       _lc.set(Math.sin(ang) * dist, dist * lerp(0.38, 0.18, chuteVis), Math.cos(ang) * dist);
       camPos.lerp(_a.copy(vehPos).add(_lc), camLand);
-      const tgtUp = 7 * chuteVis;   // frame the canopy, then relax back down
+      /* the SA centre is ~1.1 units above the group origin once the PA is
+         gone; lift the aim point so the sphere is not framed low */
+      const tgtUp = 7 * chuteVis + 1.1;
       camTgt.lerp(_b.copy(vehPos).add(_c.set(0, tgtUp, 0)), camLand);
       /* once Gagarin is down, widen onto the midpoint between him and the
          capsule so the final frame holds both */
-      const duoK = sstep(T_GAG_TOUCH - 0.004, T_GAG_TOUCH + 0.010, t);
+      const duoK = sstep(T_EJECT, T_EJECT + 0.004, t);
       if (duoK > 0 && cosmonaut && cosmonaut.visible) {
-        _d.copy(vehPos).add(cosmonaut.position).multiplyScalar(0.5);
+        _d.copy(vehPos).add(_c.set(0, 1.1, 0))
+          .add(_f.copy(cosmonaut.position).add(_c.set(0, 0.9, 0)))
+          .multiplyScalar(0.5);
         camTgt.lerp(_d, duoK);
-        const duoDist = Math.max(dist, vehPos.distanceTo(cosmonaut.position) * 1.7);
+        const duoDist = Math.max(dist, _f.copy(vehPos).add(_c.set(0, 1.1, 0))
+          .distanceTo(_g.copy(cosmonaut.position).add(_c.set(0, 0.9, 0))) * 1.7 * aspectFix);
         _lc.set(Math.sin(ang) * duoDist, duoDist * 0.30, Math.cos(ang) * duoDist);
         camPos.lerp(_e.copy(_d).add(_lc), duoK);
       }
@@ -2128,9 +2540,14 @@ function applyTimeline(t, dt) {
   const at = Math.abs(mt);
   clockEl.innerHTML = 'T' + sign + String(Math.floor(at / 60)).padStart(2, '0') + ':' +
                       String(Math.floor(at % 60)).padStart(2, '0');
-  let ph = PHASES[0][1];
-  for (const [pt, name] of PHASES) if (t >= pt) ph = name;
-  phaseEl.innerHTML = ph;
+  let phEntry = PHASES[0];
+  for (const e of PHASES) if (t >= e[0]) phEntry = e;
+  phaseEl.innerHTML = phEntry[1];
+  eventTimeEl.textContent = 'Moscow ' + mskAt(mt) + '  ·  UTC ' + utcAt(mt);
+  if (miniEl) {
+    miniEl.textContent = clockEl.textContent + ' · ' +
+      phEntry[1].replace(/\s{2}-\s{2}/, ' - ');
+  }
   altEl.textContent = Math.round(keyframe(t, ALT_KM)) + ' km';
   velEl.textContent = Math.round(keyframe(t, VEL_MS) / 10) * 10 + ' m/s';
   accEl.textContent = keyframe(t, ACC_G).toFixed(2) + ' g';
@@ -2138,11 +2555,11 @@ function applyTimeline(t, dt) {
   /* Slant range back to the pad, in real km: the great-circle arc of the
      ground track (wrapped, so it shrinks again as the capsule laps the
      pad), not the integrated path length. After retrofire converge on the
-     real figure: the landing site lay ~800 km from Baikonur. */
+     real figure: the landing site lies ~1,400 km from Baikonur. */
   const wrap = ((downAngle(t) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
   const arcKm = Math.min(wrap, Math.PI * 2 - wrap) * EARTH_R * M_PER_UNIT / 1000;
   let rangeKm = Math.hypot(altKm, arcKm);
-  if (t > T_RETRO) rangeKm = lerp(RANGE_AT_RETRO, 800, sstep(T_RETRO, T_TOUCH, t));
+  if (t > T_RETRO) rangeKm = lerp(RANGE_AT_RETRO, 1400, sstep(T_RETRO, T_TOUCH, t));
   rangeEl.textContent = rangeKm < 10 ? rangeKm.toFixed(1) + ' km' : Math.round(rangeKm) + ' km';
   compEl.textContent = timeCompression().toFixed(0) + '\u00d7';
   tOrbitEl.textContent = (ORBIT_PERIOD / 60).toFixed(2) + ' min';

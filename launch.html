@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vostok 1 — Launch &amp; Orbit</title>
+<link rel="icon" href="data:,">
+<title>Vostok 1 — Launch, Orbit &amp; Landing</title>
 <style>
   :root { --ink:#dce4ee; --dim:#7d8a9c; --panel:rgba(8,11,16,.74); --line:rgba(150,170,200,.18); }
   * { box-sizing:border-box; }
@@ -12,13 +13,29 @@
   canvas { display:block; }
   a { color:#7fb4ff; }
 
-  #ui { position:fixed; top:12px; left:12px; width:270px; padding:13px 15px 12px;
+  #ui { position:fixed; top:12px; left:12px; width:286px; padding:13px 15px 12px;
         background:var(--panel); border:1px solid var(--line); border-radius:9px;
         backdrop-filter:blur(9px); user-select:none; z-index:10; }
+  #ui { transition:width .2s ease, padding .2s ease; }
   #ui h1 { margin:0 0 1px; font-size:13px; letter-spacing:.09em; text-transform:uppercase; color:#fff; }
   #ui .sub { color:var(--dim); font-size:11px; margin-bottom:10px; }
+  #uiHead { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+  #uiHead > div { min-width:0; }
+  #uiToggle { flex:none; width:26px; height:26px; padding:0; display:grid; place-items:center;
+              font-size:16px; line-height:1; border-radius:6px; }
+  #mini { display:none; color:#fff; font-size:11.5px; font-variant-numeric:tabular-nums;
+          white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:4px;
+          max-width:calc(100vw - 100px); }
+  #mini span { color:var(--dim); }
+  #ui.collapsed { width:auto; min-width:215px; max-width:calc(100vw - 24px); padding:10px 12px; }
+  #ui.collapsed #uiBody { display:none; }
+  #ui.collapsed .sub { display:none; }
+  #ui.collapsed h1 { font-size:12px; margin:0; }
+  #ui.collapsed #uiHead { align-items:center; }
+  #ui.collapsed #mini { display:block; }
 
-  #phase { color:#ffd479; font-size:11.5px; letter-spacing:.04em; height:1.4em; }
+  #phase { color:#ffd479; font-size:11.5px; letter-spacing:.04em; min-height:2.7em; line-height:1.35; }
+  #eventTime { color:var(--dim); font-size:10.5px; letter-spacing:.02em; margin:-1px 0 3px; }
   #clock { color:#fff; font-size:20px; font-variant-numeric:tabular-nums; letter-spacing:.02em; }
   #clock small { color:var(--dim); font-size:11px; }
 
@@ -52,6 +69,19 @@
   #tele div { color:var(--dim); }
   #tele b { color:#9fe0a0; font-weight:400; font-variant-numeric:tabular-nums; }
 
+  /* Portrait phones: the panel must not swallow the sequence.  It starts
+     collapsed and expands into a scrollable sheet when tapped. */
+  @media (max-width: 760px), (orientation: portrait), (max-height: 520px) {
+    #ui { width:calc(100% - 24px); max-width:380px; max-height:calc(100dvh - 24px);
+          overflow-y:auto; -webkit-overflow-scrolling:touch; }
+    #ui.collapsed { width:auto; max-width:calc(100vw - 24px); overflow:hidden; }
+    #ui h1 { font-size:12px; }
+    #phase { min-height:2.4em; }
+    #hud { display:none; }
+    #tele { font-size:9.5px; padding:6px 8px; }
+    #tele div { line-height:1.5; }
+  }
+
   #load { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
           background:#000; z-index:50; color:var(--dim); letter-spacing:.14em; }
   #load.done { opacity:0; pointer-events:none; transition:opacity .6s; }
@@ -61,11 +91,20 @@
 <body>
 
 <div id="ui">
-  <h1>Vostok&nbsp;1 &middot; Launch &amp; Orbit</h1>
-  <div class="sub">12 April 1961 &middot; 06:07 UTC &middot; Baikonur</div>
+  <div id="uiHead">
+    <div>
+      <h1>Vostok&nbsp;1 &middot; Mission</h1>
+      <div class="sub">12 April 1961 &middot; 09:06:59 MSK &middot; Baikonur</div>
+    </div>
+    <button id="uiToggle" type="button" aria-expanded="true" aria-controls="uiBody"
+            aria-label="Collapse mission panel" title="Collapse panel">&minus;</button>
+  </div>
+  <div id="mini">T&minus;00:10 &middot; pre-launch</div>
+  <div id="uiBody">
 
-  <div id="clock">T&minus;<small>00:00</small></div>
+  <div id="clock">T&minus;00:10</div>
   <div id="phase">&nbsp;</div>
+  <div id="eventTime">Moscow 09:06:49 &middot; UTC 06:06:49</div>
 
   <div class="tline">
     <div class="marks" id="marks"></div>
@@ -75,9 +114,9 @@
   <div class="row"><span>altitude</span><output id="alt">0 km</output></div>
   <div class="row"><span>velocity</span><output id="vel">0 m/s</output></div>
   <div class="row"><span>acceleration</span><output id="acc">0.00 g</output></div>
-  <div class="row"><span>mass</span><output id="mass">287.0 t</output></div>
+  <div class="row"><span>mass</span><output id="mass">286.9 t</output></div>
   <div class="row"><span>range to pad</span><output id="range">0 km</output></div>
-  <div class="row"><span>time compression</span><output id="comp">68&times;</output></div>
+  <div class="row"><span>time compression</span><output id="comp">67&times;</output></div>
   <div class="btns" id="rateBtns">
     <button data-rate="0.25">0.25&times;</button>
     <button data-rate="0.5">0.5&times;</button>
@@ -94,9 +133,10 @@
     <button id="auto">auto cam</button>
     <button id="free">free look</button>
   </div>
+  </div><!-- /#uiBody -->
 </div>
 
-<div id="hud">Earth imagery: NASA Blue Marble<br><a href="assets/textures/earth/SOURCES.md">sources &amp; licence</a><br><a href="index.html">&#9664; model viewer</a></div>
+<div id="hud">Earth imagery: NASA Blue Marble<br><a href="assets/textures/earth/SOURCES.md">sources &amp; licence</a><br>flight 106 min &middot; 4,725 kg<br><a href="index.html">&#9664; model viewer</a></div>
 
 <div id="tele">
   <div>orbit period <b id="tOrbit">—</b></div>
