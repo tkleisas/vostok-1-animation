@@ -34,6 +34,7 @@ BLEND = os.path.join(ROOT, 'assets', 'vostok-source.blend')
 OUT = os.path.join(ROOT, 'assets', 'vostok-1.glb')
 FONT_PATH = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
 EMBLEM_PATH = os.path.join(ROOT, 'tools', 'emblem_source.png')
+STAR_PATH = os.path.join(ROOT, 'tools', 'star_source.png')
 
 TAU = 2 * math.pi
 
@@ -91,6 +92,23 @@ EMBLEM.node_tree.links.new(et.outputs['Alpha'], eb.inputs['Alpha'])
 eb.inputs['Roughness'].default_value = 0.55
 eb.inputs['Metallic'].default_value = 0.0
 EMBLEM.surface_render_method = 'BLENDED'
+
+# Red-star decal: same curved-decal treatment, so the star follows the tank
+# instead of being a flat tangent plate whose corners lift off the surface.
+star_img = bpy.data.images.load(STAR_PATH)
+star_img.alpha_mode = 'STRAIGHT'
+STAR = bpy.data.materials.new('Star_Red')
+STAR.use_nodes = True
+STAR.use_backface_culling = False
+sb = STAR.node_tree.nodes['Principled BSDF']
+st = STAR.node_tree.nodes.new('ShaderNodeTexImage')
+st.image = star_img
+st.interpolation = 'Linear'
+STAR.node_tree.links.new(st.outputs['Color'], sb.inputs['Base Color'])
+STAR.node_tree.links.new(st.outputs['Alpha'], sb.inputs['Alpha'])
+sb.inputs['Roughness'].default_value = 0.55
+sb.inputs['Metallic'].default_value = 0.0
+STAR.surface_render_method = 'BLENDED'
 
 FONT = bpy.data.fonts.load(FONT_PATH)
 
@@ -329,22 +347,9 @@ def vertical_text(text, theta, z_top, size, material, radius_fn, parent_obj,
     return objs
 
 
-def star(name, outer, inner, material, theta, z, radius, parent_obj):
-    verts = [(0, 0, 0)]
-    for i in range(10):
-        a = math.pi / 2 + i * math.pi / 5
-        r = outer if i % 2 == 0 else inner
-        verts.append((r * math.cos(a), r * math.sin(a), 0))
-    faces = [(0, i + 1, (i + 1) % 10 + 1) for i in range(10)]
-    ob = mesh_object(name, verts, faces, material, smooth=False)
-    place_on_cylinder(ob, theta, z, radius)
-    parent(ob, parent_obj)
-    return ob
-
-
 def curved_decal(name, theta, zc, width, height, radius, parent_obj=None,
-                 nu=8, nv=8):
-    """A texture-mapped sheet wrapped around a cylinder (for the emblem)."""
+                 material=None, nu=8, nv=8):
+    """A texture-mapped sheet wrapped around a cylinder (emblem/star)."""
     verts, uvs, faces = [], [], []
     for j in range(nv + 1):
         v = j / nv
@@ -362,7 +367,7 @@ def curved_decal(name, theta, zc, width, height, radius, parent_obj=None,
     me.from_pydata(verts, [], faces)
     me.validate()
     me.update()
-    me.materials.append(EMBLEM)
+    me.materials.append(material or EMBLEM)
     uv = me.uv_layers.new(name='UVMap')
     for li, loop in enumerate(me.loops):
         uv.data[li].uv = uvs[loop.vertex_index]
@@ -374,6 +379,17 @@ def curved_decal(name, theta, zc, width, height, radius, parent_obj=None,
     if parent_obj is not None:
         parent(ob, parent_obj)
     return ob
+
+
+def star(name, outer, inner, material, theta, z, radius, parent_obj):
+    """A red star painted onto the curved tank surface.
+
+    The source star is an alpha texture, so its silhouette can follow the
+    cylinder exactly; there is no flat plate to lift off at the corners.
+    """
+    size = outer / 0.48
+    return curved_decal(name, theta, z, size, size, radius, parent_obj,
+                        material=STAR, nu=14, nv=10)
 
 
 # --------------------------------------------------------------------------
@@ -492,11 +508,14 @@ for theta in (0.0, math.pi):
     marks += vertical_text('CCCP', theta, 26.4, 0.85, RED, core_radius, core, spacing=1.05)
 for theta in (math.pi / 2, 3 * math.pi / 2):
     marks += vertical_text('ВОСТОК', theta, 25.4, 0.55, RED, core_radius, core, spacing=1.05)
-for theta in (math.pi / 4, 5 * math.pi / 4):
-    marks.append(star('core_star_%d' % int(theta * 100), 0.90, 0.36, RED,
-                      theta, 21.2, core_radius(21.2) + 0.03, core))
 marks = join(marks, 'Core_Markings', RED)
 parent(marks, core)
+stars = []
+for theta in (math.pi / 4, 5 * math.pi / 4):
+    stars.append(star('core_star_%d' % int(theta * 100), 0.90, 0.36, RED,
+                      theta, 21.2, core_radius(21.2) + 0.03, core))
+stars = join(stars, 'Core_Stars')
+parent(stars, core)
 emblems = []
 for theta in (3 * math.pi / 4, 7 * math.pi / 4):
     emblems.append(curved_decal('core_emblem_%d' % int(theta * 100), theta,
@@ -563,8 +582,9 @@ for i in range(4):
     parent(det, body)
 
     # outboard livery: a large red star plus CCCP down the upper tank
-    bmarks = [star('Booster_%d_Star' % (i + 1), 0.82, 0.33, RED, a,
-                   10.5, boost_radius(10.5) + 0.03 + BOOST_C, body)]
+    star('Booster_%d_Star' % (i + 1), 0.82, 0.33, RED, a,
+         10.5, boost_radius(10.5) + 0.03 + BOOST_C, body)
+    bmarks = []
     for k, ch in enumerate('CCCP'):
         z = 15.25 - k * 0.34 * 1.05
         ob = text_object(ch, 0.34, RED, name='boost_cccp_%d_%d' % (i, k))
@@ -685,10 +705,10 @@ for side, (t0, t1) in (('L', (-math.pi / 2, math.pi / 2)),
     emb_a = math.pi / 4 if side == 'L' else 5 * math.pi / 4
     marks = vertical_text('CCCP', theta, 36.85, 0.64, RED,
                           lambda z: fair_radius(z) + 0.055, half, spacing=1.05)
-    marks.append(star('fairing_star_%s' % side, 0.55, 0.22, RED,
-                      star_a, 34.55, fair_radius(34.55) + 0.07, half))
     marks = join(marks, 'Fairing_%s_Markings' % side, RED)
     parent(marks, half)
+    star('Fairing_%s_Star' % side, 0.55, 0.22, RED,
+         star_a, 34.55, fair_radius(34.55) + 0.07, half)
     emb = curved_decal('Fairing_%s_Emblem' % side, emb_a, 35.15, 0.95, 0.95,
                        fair_radius(35.15) + 0.065, half)
     parent(emb, half)

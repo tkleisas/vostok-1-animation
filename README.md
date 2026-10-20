@@ -132,9 +132,10 @@ The stack is generated from `tools/build_vostok.py` at true scale (metres):
 - painted markings around the whole stack: vertical **CCCP** on the core,
   shroud and strap-ons, **ВОСТОК** on the core, large red stars on the core,
   shroud and boosters, and the hammer-and-sickle emblem on both the core and
-  the shroud. The emblem uses the public-domain source in
-  `tools/emblem_source.png` as a small alpha decal; everything else is
-  geometry. There is no 4K atlas.
+  the shroud. The letters are geometry; the stars and emblem are small alpha
+  decals wrapped onto curved sheets (`tools/star_source.png`,
+  `tools/emblem_source.png`) so they follow the tank instead of standing off
+  it. There is no 4K atlas.
 
 The viewer's staging slider separates the strap-ons, fins, shroud petals,
 core/truss, Block E and spacecraft; the capsule and PA are preserved as a
@@ -164,8 +165,8 @@ blender --background --factory-startup --python tools/build_cosmonaut.py  # gaga
 
 `tools/build_vostok.py` writes `assets/vostok-source.blend` and
 `assets/vostok-1.glb`. The old 4K paint atlas has been retired: the livery
-is geometry plus one small hammer-and-sickle decal, so the markings stay
-crisp at any distance.
+is geometry plus two small curved decals (star and hammer-and-sickle), so
+the markings stay flush and crisp at any distance.
 
 ## Credits
 
